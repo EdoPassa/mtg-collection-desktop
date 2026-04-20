@@ -46,6 +46,14 @@ class ScryfallClient:
 
         raise ScryfallError(f"No match for: {name}")
 
+    def lookup_scryfall_id(self, scryfall_id: str) -> ScryfallCard:
+        scryfall_id = scryfall_id.strip()
+        if not scryfall_id:
+            raise ScryfallError("Empty Scryfall ID")
+
+        data = self._get_json_required(f"https://api.scryfall.com/cards/{scryfall_id}", params={})
+        return self._to_card(data)
+
     def _get_json(self, url: str, params: dict[str, str]) -> dict[str, Any] | None:
         r = self._session.get(url, params=params, timeout=self._timeout_s)
         # Scryfall returns 404 with a JSON error when no match is found.
@@ -59,6 +67,17 @@ class ScryfallClient:
         if data.get("object") == "error":
             # For safety; shouldn't happen for non-404.
             return None
+        return data
+
+    def _get_json_required(self, url: str, params: dict[str, str]) -> dict[str, Any]:
+        r = self._session.get(url, params=params, timeout=self._timeout_s)
+        if r.status_code >= 400:
+            raise ScryfallError(f"Scryfall HTTP {r.status_code}: {r.text[:2000]}")
+        data = r.json()
+        if not isinstance(data, dict):
+            raise ScryfallError("Unexpected Scryfall response type")
+        if data.get("object") == "error":
+            raise ScryfallError(_pick(data, "details"))
         return data
 
     def _to_card(self, data: dict[str, Any]) -> ScryfallCard:

@@ -158,7 +158,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for line in lines:
             try:
-                card = self._scryfall.lookup_named(line.name)
+                if line.scryfall_id:
+                    card = self._scryfall.lookup_scryfall_id(line.scryfall_id)
+                else:
+                    card = self._scryfall.lookup_named(line.name)
             except ScryfallError as e:
                 unresolved_msgs.append(f"- {line.raw}  ->  {e}")
                 continue

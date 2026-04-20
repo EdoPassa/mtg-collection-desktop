@@ -11,6 +11,7 @@ class ImportLine:
     raw: str
     qty: int
     name: str
+    scryfall_id: str | None = None
 
 
 _QTY_PREFIX = re.compile(r"^\s*(?P<qty>\d+)\s*(x)?\s+(?P<name>.+?)\s*$", re.IGNORECASE)
@@ -45,7 +46,7 @@ def parse_txt(text: str) -> tuple[list[ImportLine], list[str]]:
             unresolved.append(raw)
             continue
 
-        parsed.append(ImportLine(raw=raw, qty=qty, name=name))
+        parsed.append(ImportLine(raw=raw, qty=qty, name=name, scryfall_id=None))
 
     return parsed, unresolved
 
@@ -59,16 +60,28 @@ def parse_csv_bytes(data: bytes, encoding: str = "utf-8") -> tuple[list[ImportLi
     if reader.fieldnames is None:
         return [], ["CSV has no header row"]
 
-    lowered = {h.lower(): h for h in reader.fieldnames if isinstance(h, str)}
-    name_key = lowered.get("name")
-    qty_key = lowered.get("quantity") or lowered.get("qty")
+    def norm(h: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", h.strip().casefold())
+
+    normalized: dict[str, str] = {norm(h): h for h in reader.fieldnames if isinstance(h, str)}
+
+    # Common export formats:
+    # - "name, quantity"
+    # - "Card Name, Quantity, Scryfall ID" (this repo's sample)
+    name_key = normalized.get("name") or normalized.get("cardname")
+    qty_key = normalized.get("quantity") or normalized.get("qty")
+    scryfall_id_key = normalized.get("scryfallid")
 
     if not name_key or not qty_key:
-        return [], [f"CSV must include columns: name, quantity (found: {reader.fieldnames})"]
+        return [], [
+            "CSV must include columns for card name and quantity "
+            f"(expected one of: name/card name + quantity/qty; found: {reader.fieldnames})"
+        ]
 
     for row in reader:
         raw_name = (row.get(name_key) or "").strip()
         raw_qty = (row.get(qty_key) or "").strip()
+        raw_scryfall_id = ((row.get(scryfall_id_key) if scryfall_id_key else None) or "").strip()
         if not raw_name or not raw_qty:
             unresolved.append(str(row))
             continue
@@ -80,7 +93,14 @@ def parse_csv_bytes(data: bytes, encoding: str = "utf-8") -> tuple[list[ImportLi
         if qty <= 0:
             unresolved.append(str(row))
             continue
-        parsed.append(ImportLine(raw=str(row), qty=qty, name=raw_name))
+        parsed.append(
+            ImportLine(
+                raw=str(row),
+                qty=qty,
+                name=raw_name,
+                scryfall_id=raw_scryfall_id or None,
+            )
+        )
 
     return parsed, unresolved
 
