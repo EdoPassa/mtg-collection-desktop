@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+import re
+
 
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
@@ -31,6 +33,13 @@ class CardIdentity:
     oracle_id: str
     name: str
     scryfall_uri: str
+
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_name(name: str) -> str:
+    return _WS_RE.sub(" ", name.strip()).casefold()
 
 
 class CollectionDb:
@@ -88,7 +97,7 @@ class CollectionDb:
     def list_collection(self) -> list[sqlite3.Row]:
         cur = self._conn.execute(
             """
-            SELECT c.name, ci.quantity, c.scryfall_uri
+            SELECT ci.oracle_id, c.name, ci.quantity, c.scryfall_uri
             FROM collection_items ci
             JOIN cards c ON c.oracle_id = ci.oracle_id
             ORDER BY c.name COLLATE NOCASE
@@ -121,4 +130,67 @@ class CollectionDb:
         for row in cur.fetchall():
             out[str(row["oracle_id"])] = (str(row["name"]), int(row["quantity"]))
         return out
+
+    def get_owned_by_normalized_name(self) -> dict[str, list[tuple[str, str, int]]]:
+        """
+        Returns a mapping from normalized card name -> list of (oracle_id, name, quantity).
+
+        Normalization is conservative: trim, collapse whitespace, casefold.
+        """
+        cur = self._conn.execute(
+            """
+            SELECT ci.oracle_id, c.name, ci.quantity
+            FROM collection_items ci
+            JOIN cards c ON c.oracle_id = ci.oracle_id
+            """
+        )
+        out: dict[str, list[tuple[str, str, int]]] = {}
+        for row in cur.fetchall():
+            oracle_id = str(row["oracle_id"])
+            name = str(row["name"])
+            qty = int(row["quantity"])
+            key = _normalize_name(name)
+            if not key:
+                continue
+            out.setdefault(key, []).append((oracle_id, name, qty))
+        return out
+
+    def move_collection_quantity(self, *, from_oracle_id: str, to_card: CardIdentity) -> None:
+        """
+        Move (merge) collection quantity from one oracle_id to another.
+
+        - Ensures destination card exists in `cards`
+        - Adds source quantity onto destination quantity (if present)
+        - Removes source row from `collection_items`
+        """
+        from_oracle_id = str(from_oracle_id)
+        if not from_oracle_id:
+            return
+
+        self.upsert_cards([to_card])
+
+        cur = self._conn.execute(
+            "SELECT quantity FROM collection_items WHERE oracle_id = ?",
+            (from_oracle_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return
+        qty = int(row["quantity"])
+        if qty <= 0:
+            self._conn.execute("DELETE FROM collection_items WHERE oracle_id = ?", (from_oracle_id,))
+            self._conn.commit()
+            return
+
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT INTO collection_items (oracle_id, quantity)
+                VALUES (?, ?)
+                ON CONFLICT(oracle_id) DO UPDATE SET
+                  quantity = quantity + excluded.quantity
+                """,
+                (to_card.oracle_id, qty),
+            )
+            self._conn.execute("DELETE FROM collection_items WHERE oracle_id = ?", (from_oracle_id,))
 

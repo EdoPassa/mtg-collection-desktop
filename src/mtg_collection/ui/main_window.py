@@ -7,7 +7,7 @@ from PySide6 import QtCore, QtWidgets
 
 from mtg_collection.db import CardIdentity, CollectionDb
 from mtg_collection.importer import ImportLine, parse_csv_bytes, parse_txt
-from mtg_collection.resolver import ApiOnlyResolver, CardResolver, ResolveResult, build_default_bulk_first_resolver
+from mtg_collection.resolver import ApiOnlyResolver, CardResolver, ResolveResult, build_default_bulk_first_resolver, normalize_card_name
 from mtg_collection.scryfall import ScryfallClient, ScryfallError
 
 
@@ -43,6 +43,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._build_deck_tab()
 
         self.refresh_collection()
+
+        self._deck_last_mismatches: list[tuple[str, CardIdentity]] = []
 
     def _build_import_tab(self) -> None:
         layout = QtWidgets.QVBoxLayout(self._import_tab)
@@ -93,8 +95,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_collection_tab(self) -> None:
         layout = QtWidgets.QVBoxLayout(self._collection_tab)
 
-        self._collection_table = QtWidgets.QTableWidget(0, 3)
-        self._collection_table.setHorizontalHeaderLabels(["Card", "Quantity", "Scryfall"])
+        self._collection_table = QtWidgets.QTableWidget(0, 4)
+        self._collection_table.setHorizontalHeaderLabels(["Card", "Quantity", "Oracle ID", "Scryfall"])
         self._collection_table.horizontalHeader().setStretchLastSection(True)
         self._collection_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         layout.addWidget(self._collection_table)
@@ -110,9 +112,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self._deck_input.setPlaceholderText("Paste a target decklist (same TXT format):\n4 Lightning Bolt\n2 Opt")
         layout.addWidget(self._deck_input, 2)
 
+        btn_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(btn_row)
+        btn_row.addStretch(1)
+
+        self._deck_repair_btn = QtWidgets.QPushButton("Repair mismatches")
+        self._deck_repair_btn.setEnabled(False)
+        self._deck_repair_btn.clicked.connect(self._repair_deck_mismatches)
+        btn_row.addWidget(self._deck_repair_btn)
+
         btn = QtWidgets.QPushButton("Compute owned vs need")
         btn.clicked.connect(self._compute_deck_compare)
-        layout.addWidget(btn, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
+        btn_row.addWidget(btn)
 
         self._deck_out = QtWidgets.QTableWidget(0, 4)
         self._deck_out.setHorizontalHeaderLabels(["Card", "Needed", "Owned", "Missing"])
@@ -213,11 +224,14 @@ class MainWindow(QtWidgets.QMainWindow):
         for r, row in enumerate(rows):
             self._collection_table.setItem(r, 0, QtWidgets.QTableWidgetItem(str(row["name"])))
             self._collection_table.setItem(r, 1, QtWidgets.QTableWidgetItem(str(row["quantity"])))
-            self._collection_table.setItem(r, 2, QtWidgets.QTableWidgetItem(str(row["scryfall_uri"])))
+            self._collection_table.setItem(r, 2, QtWidgets.QTableWidgetItem(str(row["oracle_id"])))
+            self._collection_table.setItem(r, 3, QtWidgets.QTableWidgetItem(str(row["scryfall_uri"])))
 
     def _compute_deck_compare(self) -> None:
         self._deck_out.setRowCount(0)
         self._deck_unresolved.clear()
+        self._deck_last_mismatches = []
+        self._deck_repair_btn.setEnabled(False)
 
         lines, unresolved = parse_txt(self._deck_input.toPlainText())
         unresolved_msgs: list[str] = []
@@ -228,6 +242,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Validate decklist lines against Scryfall so we can compare by oracle_id
         wanted_by_oracle: dict[str, tuple[str, int]] = {}
         resolved_cards: list[CardIdentity] = []
+        resolved_cards_by_oracle: dict[str, CardIdentity] = {}
         resolved_cache: dict[str, ResolveResult] = {}
         for l in lines:
             try:
@@ -240,7 +255,9 @@ class MainWindow(QtWidgets.QMainWindow):
             except ScryfallError as e:
                 unresolved_msgs.append(f"- {l.raw}  ->  {e}")
                 continue
-            resolved_cards.append(CardIdentity(card.oracle_id, card.name, card.scryfall_uri))
+            ident = CardIdentity(card.oracle_id, card.name, card.scryfall_uri)
+            resolved_cards.append(ident)
+            resolved_cards_by_oracle[card.oracle_id] = ident
             prev_name, prev_qty = wanted_by_oracle.get(card.oracle_id, (card.name, 0))
             wanted_by_oracle[card.oracle_id] = (prev_name, prev_qty + l.qty)
 
@@ -248,12 +265,31 @@ class MainWindow(QtWidgets.QMainWindow):
             self._db.upsert_cards(resolved_cards)
 
         owned_by_oracle = self._db.get_owned_by_oracle_id()
+        owned_by_norm_name = self._db.get_owned_by_normalized_name()
 
         oracle_ids = sorted(wanted_by_oracle.keys(), key=lambda oid: wanted_by_oracle[oid][0].casefold())
         self._deck_out.setRowCount(len(oracle_ids))
         for r, oracle_id in enumerate(oracle_ids):
             name, need = wanted_by_oracle[oracle_id]
             _, have = owned_by_oracle.get(oracle_id, (name, 0))
+            if have <= 0:
+                k = normalize_card_name(name)
+                candidates = owned_by_norm_name.get(k, [])
+                if candidates:
+                    have = sum(qty for _, _, qty in candidates)
+                    if len(candidates) == 1:
+                        cand_oracle, cand_name, cand_qty = candidates[0]
+                        if cand_oracle != oracle_id and cand_qty > 0:
+                            to_card = resolved_cards_by_oracle.get(oracle_id)
+                            if to_card is not None:
+                                self._deck_last_mismatches.append((cand_oracle, to_card))
+                            unresolved_msgs.append(
+                                f"- Oracle ID mismatch for {cand_name!r}: collection has {cand_oracle}, deck resolves to {oracle_id}. Using name fallback (owned={cand_qty})."
+                            )
+                    else:
+                        unresolved_msgs.append(
+                            f"- Ambiguous name match for {name!r}: found {len(candidates)} owned entries with that name; using sum={have} but cannot auto-repair."
+                        )
             missing = max(0, need - have)
             self._deck_out.setItem(r, 0, QtWidgets.QTableWidgetItem(name))
             self._deck_out.setItem(r, 1, QtWidgets.QTableWidgetItem(str(need)))
@@ -261,6 +297,27 @@ class MainWindow(QtWidgets.QMainWindow):
             self._deck_out.setItem(r, 3, QtWidgets.QTableWidgetItem(str(missing)))
 
         self._deck_unresolved.setPlainText("\n".join(unresolved_msgs).strip())
+        self._deck_repair_btn.setEnabled(len(self._deck_last_mismatches) > 0)
+
+    def _repair_deck_mismatches(self) -> None:
+        if not self._deck_last_mismatches:
+            return
+
+        # Dedupe repairs: (from_oracle_id, to_oracle_id)
+        unique: dict[tuple[str, str], CardIdentity] = {}
+        for from_oracle, to_card in self._deck_last_mismatches:
+            unique[(from_oracle, to_card.oracle_id)] = to_card
+
+        repaired = 0
+        for (from_oracle, _), to_card in unique.items():
+            if from_oracle == to_card.oracle_id:
+                continue
+            self._db.move_collection_quantity(from_oracle_id=from_oracle, to_card=to_card)
+            repaired += 1
+
+        self.refresh_collection()
+        self._compute_deck_compare()
+        QtWidgets.QMessageBox.information(self, "Repair complete", f"Repaired {repaired} mismatched entr(y/ies).")
 
 
 def run_app() -> None:
