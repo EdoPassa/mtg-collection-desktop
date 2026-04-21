@@ -125,6 +125,22 @@ class MainWindow(QtWidgets.QMainWindow):
         btn.clicked.connect(self._compute_deck_compare)
         btn_row.addWidget(btn)
 
+        filter_export_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(filter_export_row)
+
+        self._deck_filter = QtWidgets.QComboBox()
+        self._deck_filter.addItems(["All", "Missing cards"])
+        self._deck_filter.currentTextChanged.connect(self._apply_deck_filter)
+        filter_export_row.addWidget(QtWidgets.QLabel("Filter:"))
+        filter_export_row.addWidget(self._deck_filter)
+
+        filter_export_row.addStretch(1)
+
+        self._deck_export_btn = QtWidgets.QPushButton("Export to CSV…")
+        self._deck_export_btn.setEnabled(False)
+        self._deck_export_btn.clicked.connect(self._export_deck_compare)
+        filter_export_row.addWidget(self._deck_export_btn)
+
         self._deck_out = QtWidgets.QTableWidget(0, 4)
         self._deck_out.setHorizontalHeaderLabels(["Card", "Needed", "Owned", "Missing"])
         self._deck_out.horizontalHeader().setStretchLastSection(True)
@@ -232,6 +248,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._deck_unresolved.clear()
         self._deck_last_mismatches = []
         self._deck_repair_btn.setEnabled(False)
+        self._deck_export_btn.setEnabled(False)
 
         lines, unresolved = parse_txt(self._deck_input.toPlainText())
         unresolved_msgs: list[str] = []
@@ -298,6 +315,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._deck_unresolved.setPlainText("\n".join(unresolved_msgs).strip())
         self._deck_repair_btn.setEnabled(len(self._deck_last_mismatches) > 0)
+        self._deck_export_btn.setEnabled(self._deck_out.rowCount() > 0)
+        self._apply_deck_filter()
 
     def _repair_deck_mismatches(self) -> None:
         if not self._deck_last_mismatches:
@@ -318,6 +337,46 @@ class MainWindow(QtWidgets.QMainWindow):
         self.refresh_collection()
         self._compute_deck_compare()
         QtWidgets.QMessageBox.information(self, "Repair complete", f"Repaired {repaired} mismatched entr(y/ies).")
+
+    def _apply_deck_filter(self) -> None:
+        mode = self._deck_filter.currentText()
+        for r in range(self._deck_out.rowCount()):
+            show = True
+            if mode == "Missing cards":
+                missing_item = self._deck_out.item(r, 3)
+                if missing_item and int(missing_item.text()) <= 0:
+                    show = False
+            self._deck_out.setRowHidden(r, not show)
+
+    def _export_deck_compare(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Export CSV", "", "CSV Files (*.csv);;All Files (*)"
+        )
+        if not path:
+            return
+
+        import csv
+
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                headers = [
+                    self._deck_out.horizontalHeaderItem(i).text()
+                    for i in range(self._deck_out.columnCount())
+                ]
+                writer.writerow(headers)
+
+                for r in range(self._deck_out.rowCount()):
+                    if not self._deck_out.isRowHidden(r):
+                        row_data = [
+                            self._deck_out.item(r, c).text()
+                            for c in range(self._deck_out.columnCount())
+                        ]
+                        writer.writerow(row_data)
+
+            QtWidgets.QMessageBox.information(self, "Export complete", f"Exported to {path}")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Export failed", f"Failed to write CSV:\n{e}")
 
 
 def run_app() -> None:
