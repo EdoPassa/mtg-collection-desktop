@@ -301,26 +301,47 @@ def run_app() -> None:
         win_holder["win"] = win
         win.show()
 
-    def _on_ok(resolver_obj: object) -> None:
-        thread.quit()
-        thread.wait()
-        _start_with_resolver(resolver_obj)  # type: ignore[arg-type]
+    class _BootstrapController(QtCore.QObject):
+        def __init__(self) -> None:
+            super().__init__()
+            self._resolver: CardResolver | None = None
+            self._error: str | None = None
 
-    def _on_failed(msg: str) -> None:
-        thread.quit()
-        thread.wait()
-        progress.close()
-        QtWidgets.QMessageBox.warning(
-            None,
-            "Scryfall bulk data unavailable",
-            "Could not prepare the local card database.\n\n"
-            f"Reason: {msg}\n\n"
-            "The app will continue using throttled online lookups.",
-        )
-        _start_with_resolver(ApiOnlyResolver(api))
+        @QtCore.Slot(object)
+        def on_ok(self, resolver_obj: object) -> None:
+            self._resolver = resolver_obj  # type: ignore[assignment]
+            thread.quit()
 
-    worker.finished.connect(_on_ok)
-    worker.failed.connect(_on_failed)
+        @QtCore.Slot(str)
+        def on_failed(self, msg: str) -> None:
+            self._error = msg
+            thread.quit()
+
+        @QtCore.Slot()
+        def on_thread_finished(self) -> None:
+            if self._resolver is not None:
+                _start_with_resolver(self._resolver)
+                return
+
+            progress.close()
+            QtWidgets.QMessageBox.warning(
+                None,
+                "Scryfall bulk data unavailable",
+                "Could not prepare the local card database.\n\n"
+                f"Reason: {self._error or 'Unknown error'}\n\n"
+                "The app will continue using throttled online lookups.",
+            )
+            _start_with_resolver(ApiOnlyResolver(api))
+
+    controller = _BootstrapController()
+
+    # Force queued delivery so slots run on the controller's (GUI) thread.
+    worker.finished.connect(controller.on_ok, QtCore.Qt.ConnectionType.QueuedConnection)
+    worker.failed.connect(controller.on_failed, QtCore.Qt.ConnectionType.QueuedConnection)
+    thread.finished.connect(controller.on_thread_finished, QtCore.Qt.ConnectionType.QueuedConnection)
+
+    thread.finished.connect(worker.deleteLater)
+    thread.finished.connect(thread.deleteLater)
     thread.start()
     try:
         app.exec()
