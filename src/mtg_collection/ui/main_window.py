@@ -7,6 +7,7 @@ from PySide6 import QtCore, QtWidgets
 
 from mtg_collection.db import CardIdentity, CollectionDb
 from mtg_collection.importer import ImportLine, parse_csv_bytes, parse_txt
+from mtg_collection.resolver import ApiOnlyResolver, CardResolver, ResolveResult, build_default_bulk_first_resolver
 from mtg_collection.scryfall import ScryfallClient, ScryfallError
 
 
@@ -19,10 +20,10 @@ class ResolvedLine:
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, db: CollectionDb, scryfall: ScryfallClient):
+    def __init__(self, db: CollectionDb, resolver: CardResolver):
         super().__init__()
         self._db = db
-        self._scryfall = scryfall
+        self._resolver = resolver
         self.setWindowTitle("MTG Collection (MVP)")
         self.resize(1000, 700)
 
@@ -156,12 +157,15 @@ class MainWindow(QtWidgets.QMainWindow):
             unresolved_msgs.append("Unresolved parse rows:")
             unresolved_msgs.extend(f"- {u}" for u in unresolved)
 
+        resolved_cache: dict[tuple[str, str], ResolveResult] = {}
         for line in lines:
             try:
-                if line.scryfall_id:
-                    card = self._scryfall.lookup_scryfall_id(line.scryfall_id)
-                else:
-                    card = self._scryfall.lookup_named(line.name)
+                cache_key = ("id", line.scryfall_id.strip()) if line.scryfall_id else ("name", line.name.strip())
+                cached = resolved_cache.get(cache_key)
+                if cached is None:
+                    cached = self._resolver.resolve_line(line)
+                    resolved_cache[cache_key] = cached
+                card = cached.card
             except ScryfallError as e:
                 unresolved_msgs.append(f"- {line.raw}  ->  {e}")
                 continue
@@ -224,9 +228,15 @@ class MainWindow(QtWidgets.QMainWindow):
         # Validate decklist lines against Scryfall so we can compare by oracle_id
         wanted_by_oracle: dict[str, tuple[str, int]] = {}
         resolved_cards: list[CardIdentity] = []
+        resolved_cache: dict[str, ResolveResult] = {}
         for l in lines:
             try:
-                card = self._scryfall.lookup_named(l.name)
+                key = l.name.strip()
+                cached = resolved_cache.get(key)
+                if cached is None:
+                    cached = self._resolver.resolve_name(l.name)
+                    resolved_cache[key] = cached
+                card = cached.card
             except ScryfallError as e:
                 unresolved_msgs.append(f"- {l.raw}  ->  {e}")
                 continue
@@ -256,12 +266,66 @@ class MainWindow(QtWidgets.QMainWindow):
 def run_app() -> None:
     app = QtWidgets.QApplication([])
     db = CollectionDb(Path("data/collection.sqlite3"))
-    scryfall = ScryfallClient()
+    api = ScryfallClient()
 
-    win = MainWindow(db=db, scryfall=scryfall)
-    win.show()
+    progress = QtWidgets.QProgressDialog("Preparing card database…", "", 0, 0)
+    progress.setWindowTitle("MTG Collection")
+    progress.setCancelButton(None)
+    progress.setMinimumDuration(0)
+    progress.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
+    progress.show()
+
+    win_holder: dict[str, MainWindow] = {}
+
+    class _BootstrapWorker(QtCore.QObject):
+        finished = QtCore.Signal(object)
+        failed = QtCore.Signal(str)
+
+        @QtCore.Slot()
+        def run(self) -> None:
+            try:
+                _, _, resolver = build_default_bulk_first_resolver(api)
+            except Exception as e:
+                self.failed.emit(str(e))
+                return
+            self.finished.emit(resolver)
+
+    thread = QtCore.QThread()
+    worker = _BootstrapWorker()
+    worker.moveToThread(thread)
+    thread.started.connect(worker.run)
+
+    def _start_with_resolver(resolver: CardResolver) -> None:
+        progress.close()
+        win = MainWindow(db=db, resolver=resolver)
+        win_holder["win"] = win
+        win.show()
+
+    def _on_ok(resolver_obj: object) -> None:
+        thread.quit()
+        thread.wait()
+        _start_with_resolver(resolver_obj)  # type: ignore[arg-type]
+
+    def _on_failed(msg: str) -> None:
+        thread.quit()
+        thread.wait()
+        progress.close()
+        QtWidgets.QMessageBox.warning(
+            None,
+            "Scryfall bulk data unavailable",
+            "Could not prepare the local card database.\n\n"
+            f"Reason: {msg}\n\n"
+            "The app will continue using throttled online lookups.",
+        )
+        _start_with_resolver(ApiOnlyResolver(api))
+
+    worker.finished.connect(_on_ok)
+    worker.failed.connect(_on_failed)
+    thread.start()
     try:
         app.exec()
     finally:
+        thread.quit()
+        thread.wait()
         db.close()
 
