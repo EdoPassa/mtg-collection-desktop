@@ -95,15 +95,53 @@ class MainWindow(QtWidgets.QMainWindow):
     def _build_collection_tab(self) -> None:
         layout = QtWidgets.QVBoxLayout(self._collection_tab)
 
+        # --- Search bar ---
+        search_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(search_row)
+
+        search_row.addWidget(QtWidgets.QLabel("Search:"))
+        self._collection_search = QtWidgets.QLineEdit()
+        self._collection_search.setPlaceholderText("Filter by card name…")
+        self._collection_search.setClearButtonEnabled(True)
+        self._collection_search.textChanged.connect(self._filter_collection)
+        search_row.addWidget(self._collection_search)
+
+        # --- Sort selector ---
+        search_row.addWidget(QtWidgets.QLabel("Sort by:"))
+        self._collection_sort_col = QtWidgets.QComboBox()
+        self._collection_sort_col.addItems(["Card", "Quantity"])
+        search_row.addWidget(self._collection_sort_col)
+
+        self._collection_sort_order = QtWidgets.QComboBox()
+        self._collection_sort_order.addItems(["Ascending", "Descending"])
+        search_row.addWidget(self._collection_sort_order)
+
+        self._collection_sort_col.currentTextChanged.connect(lambda _: self._apply_collection_sort_and_filter())
+        self._collection_sort_order.currentTextChanged.connect(lambda _: self._apply_collection_sort_and_filter())
+
+        # --- Table ---
         self._collection_table = QtWidgets.QTableWidget(0, 4)
         self._collection_table.setHorizontalHeaderLabels(["Card", "Quantity", "Oracle ID", "Scryfall"])
         self._collection_table.horizontalHeader().setStretchLastSection(True)
         self._collection_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._collection_table.setSortingEnabled(True)
+        self._collection_table.horizontalHeader().setSortIndicatorShown(True)
         layout.addWidget(self._collection_table)
+
+        # --- Bottom row ---
+        bottom_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(bottom_row)
+
+        self._collection_count_label = QtWidgets.QLabel("")
+        bottom_row.addWidget(self._collection_count_label)
+        bottom_row.addStretch(1)
 
         refresh = QtWidgets.QPushButton("Refresh")
         refresh.clicked.connect(self.refresh_collection)
-        layout.addWidget(refresh, alignment=QtCore.Qt.AlignmentFlag.AlignRight)
+        bottom_row.addWidget(refresh)
+
+        # Cache of raw collection data for filtering
+        self._collection_rows: list[dict] = []
 
     def _build_deck_tab(self) -> None:
         layout = QtWidgets.QVBoxLayout(self._deck_tab)
@@ -236,12 +274,55 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def refresh_collection(self) -> None:
         rows = self._db.list_collection()
-        self._collection_table.setRowCount(len(rows))
-        for r, row in enumerate(rows):
-            self._collection_table.setItem(r, 0, QtWidgets.QTableWidgetItem(str(row["name"])))
-            self._collection_table.setItem(r, 1, QtWidgets.QTableWidgetItem(str(row["quantity"])))
-            self._collection_table.setItem(r, 2, QtWidgets.QTableWidgetItem(str(row["oracle_id"])))
-            self._collection_table.setItem(r, 3, QtWidgets.QTableWidgetItem(str(row["scryfall_uri"])))
+        self._collection_rows = [
+            {"name": str(r["name"]), "quantity": int(r["quantity"]),
+             "oracle_id": str(r["oracle_id"]), "scryfall_uri": str(r["scryfall_uri"])}
+            for r in rows
+        ]
+        self._apply_collection_sort_and_filter()
+
+    def _filter_collection(self, _text: str | None = None) -> None:
+        self._apply_collection_sort_and_filter()
+
+    def _apply_collection_sort_and_filter(self) -> None:
+        query = self._collection_search.text().strip().casefold()
+
+        # Filter
+        if query:
+            filtered = [r for r in self._collection_rows if query in r["name"].casefold()]
+        else:
+            filtered = list(self._collection_rows)
+
+        # Sort
+        sort_col = self._collection_sort_col.currentText()
+        reverse = self._collection_sort_order.currentText() == "Descending"
+
+        if sort_col == "Quantity":
+            filtered.sort(key=lambda r: r["quantity"], reverse=reverse)
+        else:
+            filtered.sort(key=lambda r: r["name"].casefold(), reverse=reverse)
+
+        # Populate table (disable sorting temporarily to avoid interference)
+        self._collection_table.setSortingEnabled(False)
+        self._collection_table.setRowCount(len(filtered))
+        for r, row in enumerate(filtered):
+            self._collection_table.setItem(r, 0, QtWidgets.QTableWidgetItem(row["name"]))
+
+            qty_item = QtWidgets.QTableWidgetItem()
+            qty_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, row["quantity"])
+            self._collection_table.setItem(r, 1, qty_item)
+
+            self._collection_table.setItem(r, 2, QtWidgets.QTableWidgetItem(row["oracle_id"]))
+            self._collection_table.setItem(r, 3, QtWidgets.QTableWidgetItem(row["scryfall_uri"]))
+        self._collection_table.setSortingEnabled(True)
+
+        # Update status
+        total = len(self._collection_rows)
+        shown = len(filtered)
+        if query:
+            self._collection_count_label.setText(f"Showing {shown} of {total} cards")
+        else:
+            self._collection_count_label.setText(f"{total} cards")
 
     def _compute_deck_compare(self) -> None:
         self._deck_out.setRowCount(0)
