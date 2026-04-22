@@ -317,8 +317,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._collection_table.setSortingEnabled(True)
 
         # Update status
-        total = len(self._collection_rows)
-        shown = len(filtered)
+        total = sum(r["quantity"] for r in self._collection_rows)
+        shown = sum(r["quantity"] for r in filtered)
         if query:
             self._collection_count_label.setText(f"Showing {shown} of {total} cards")
         else:
@@ -442,7 +442,7 @@ class MainWindow(QtWidgets.QMainWindow):
             with open(path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
                 headers = [
-                    self._deck_out.horizontalHeaderItem(i).text()
+                    self._deck_out.horizontalHeaderItem(i).text() # type: ignore
                     for i in range(self._deck_out.columnCount())
                 ]
                 writer.writerow(headers)
@@ -450,7 +450,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 for r in range(self._deck_out.rowCount()):
                     if not self._deck_out.isRowHidden(r):
                         row_data = [
-                            self._deck_out.item(r, c).text()
+                            self._deck_out.item(r, c).text() # type: ignore
                             for c in range(self._deck_out.columnCount())
                         ]
                         writer.writerow(row_data)
