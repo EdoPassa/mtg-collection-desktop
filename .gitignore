@@ -1,4 +1,4 @@
-```
+
 # Compiled Python files
 *.pyc
 __pycache__/
@@ -33,4 +33,12 @@ Thumbs.db
 build/
 dist/
 target/
-```
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+*.csv
+
+# App data
+*.sqlite3
+*.db
+data/
