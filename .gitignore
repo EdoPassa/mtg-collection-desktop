@@ -1,13 +1,38 @@
-__pycache__/
+
+# Compiled Python files
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
+__pycache__/
+
+# Virtual environments
 venv/
 .venv/
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build directories
 build/
 dist/
+target/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
@@ -17,9 +42,3 @@ dist/
 *.sqlite3
 *.db
 data/
-
-# OS / IDE
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/

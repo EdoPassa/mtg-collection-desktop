@@ -25,6 +25,18 @@ CREATE TABLE IF NOT EXISTS collection_items (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_collection_oracle_id ON collection_items(oracle_id);
+
+CREATE TABLE IF NOT EXISTS lent_cards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  borrower_name TEXT NOT NULL,
+  lent_date TEXT NOT NULL,
+  return_date TEXT,
+  notes TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_lent_oracle_id ON lent_cards(oracle_id);
 """
 
 
@@ -193,4 +205,92 @@ class CollectionDb:
                 (to_card.oracle_id, qty),
             )
             self._conn.execute("DELETE FROM collection_items WHERE oracle_id = ?", (from_oracle_id,))
+
+    def lend_card(self, *, oracle_id: str, quantity: int, borrower_name: str, lent_date: str, notes: str = "") -> None:
+        """
+        Record that cards have been lent to someone.
+        
+        - Adds a new entry in the lent_cards table
+        - Does NOT automatically reduce collection quantity (user manages this separately if desired)
+        """
+        if quantity <= 0:
+            raise ValueError("quantity must be > 0")
+        if not borrower_name.strip():
+            raise ValueError("borrower_name cannot be empty")
+        
+        self._conn.execute(
+            """
+            INSERT INTO lent_cards (oracle_id, quantity, borrower_name, lent_date, notes)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (oracle_id, quantity, borrower_name.strip(), lent_date, notes),
+        )
+        self._conn.commit()
+
+    def return_card(self, *, lent_id: int, return_date: str) -> None:
+        """
+        Mark a lent card as returned by setting its return_date.
+        """
+        self._conn.execute(
+            """
+            UPDATE lent_cards
+            SET return_date = ?
+            WHERE id = ?
+            """,
+            (return_date, lent_id),
+        )
+        self._conn.commit()
+
+    def get_lent_cards(self, include_returned: bool = False) -> list[sqlite3.Row]:
+        """
+        Get all lent cards, optionally including those that have been returned.
+        
+        Returns rows with: id, oracle_id, card_name, quantity, borrower_name, lent_date, return_date, notes
+        """
+        if include_returned:
+            cur = self._conn.execute(
+                """
+                SELECT lc.id, lc.oracle_id, c.name AS card_name, lc.quantity, 
+                       lc.borrower_name, lc.lent_date, lc.return_date, lc.notes
+                FROM lent_cards lc
+                JOIN cards c ON c.oracle_id = lc.oracle_id
+                ORDER BY lc.lent_date DESC
+                """
+            )
+        else:
+            cur = self._conn.execute(
+                """
+                SELECT lc.id, lc.oracle_id, c.name AS card_name, lc.quantity, 
+                       lc.borrower_name, lc.lent_date, lc.return_date, lc.notes
+                FROM lent_cards lc
+                JOIN cards c ON c.oracle_id = lc.oracle_id
+                WHERE lc.return_date IS NULL
+                ORDER BY lc.lent_date DESC
+                """
+            )
+        return list(cur.fetchall())
+
+    def get_lent_summary_by_oracle_id(self) -> dict[str, tuple[int, list[str]]]:
+        """
+        Get a summary of lent quantities per oracle_id.
+        
+        Returns: {oracle_id: (total_lent_quantity, [borrower_names])}
+        Only includes currently lent (not returned) cards.
+        """
+        cur = self._conn.execute(
+            """
+            SELECT oracle_id, SUM(quantity) as total_qty, GROUP_CONCAT(borrower_name, ', ') as borrowers
+            FROM lent_cards
+            WHERE return_date IS NULL
+            GROUP BY oracle_id
+            """
+        )
+        out: dict[str, tuple[int, list[str]]] = {}
+        for row in cur.fetchall():
+            oracle_id = str(row["oracle_id"])
+            total_qty = int(row["total_qty"])
+            borrowers_str = str(row["borrowers"]) if row["borrowers"] else ""
+            borrowers = [b.strip() for b in borrowers_str.split(",") if b.strip()]
+            out[oracle_id] = (total_qty, borrowers)
+        return out
 
