@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/mtg_collection/__init__.py
+src/mtg_collection/__main__.py
+src/mtg_collection/db.py
+src/mtg_collection/importer.py
+src/mtg_collection/resolver.py
+src/mtg_collection/scryfall.py
+src/mtg_collection/scryfall_bulk.py
+src/mtg_collection/ui/main_window.py
+src/mtg_collection_desktop.egg-info/PKG-INFO
+src/mtg_collection_desktop.egg-info/SOURCES.txt
+src/mtg_collection_desktop.egg-info/dependency_links.txt
+src/mtg_collection_desktop.egg-info/requires.txt
+src/mtg_collection_desktop.egg-info/top_level.txt

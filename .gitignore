@@ -1,25 +1,36 @@
-__pycache__/
+```
+# Compiled Python files
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
+__pycache__/
+
+# Virtual environments
 venv/
 .venv/
-build/
-dist/
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-*.csv
+.env
+.env.local
+*.env.*
 
-# App data
-*.sqlite3
-*.db
-data/
+# Logs
+*.log
 
-# OS / IDE
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS files
 .DS_Store
 Thumbs.db
-.idea/
-.vscode/
+
+# Build directories
+build/
+dist/
+target/
+```

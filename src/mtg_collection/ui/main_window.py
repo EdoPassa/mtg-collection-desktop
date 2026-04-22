@@ -33,16 +33,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self._import_tab = QtWidgets.QWidget()
         self._collection_tab = QtWidgets.QWidget()
         self._deck_tab = QtWidgets.QWidget()
+        self._lent_tab = QtWidgets.QWidget()
 
         self._tabs.addTab(self._import_tab, "Import")
         self._tabs.addTab(self._collection_tab, "Collection")
         self._tabs.addTab(self._deck_tab, "Deck compare")
+        self._tabs.addTab(self._lent_tab, "Lent cards")
 
         self._build_import_tab()
         self._build_collection_tab()
         self._build_deck_tab()
+        self._build_lent_tab()
 
         self.refresh_collection()
+        self.refresh_lent_cards()
 
         self._deck_last_mismatches: list[tuple[str, CardIdentity]] = []
 
@@ -120,8 +124,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._collection_sort_order.currentTextChanged.connect(lambda _: self._apply_collection_sort_and_filter())
 
         # --- Table ---
-        self._collection_table = QtWidgets.QTableWidget(0, 4)
-        self._collection_table.setHorizontalHeaderLabels(["Card", "Quantity", "Oracle ID", "Scryfall"])
+        self._collection_table = QtWidgets.QTableWidget(0, 5)
+        self._collection_table.setHorizontalHeaderLabels(["Card", "Owned", "Lent", "Available", "Actions"])
         self._collection_table.horizontalHeader().setStretchLastSection(True)
         self._collection_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self._collection_table.setSortingEnabled(True)
@@ -189,6 +193,73 @@ class MainWindow(QtWidgets.QMainWindow):
         self._deck_unresolved.setReadOnly(True)
         self._deck_unresolved.setPlaceholderText("Unresolved deck lines will appear here.")
         layout.addWidget(self._deck_unresolved, 1)
+
+    def _build_lent_tab(self) -> None:
+        layout = QtWidgets.QVBoxLayout(self._lent_tab)
+
+        # --- Top row: Add lent card form ---
+        form_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(form_row)
+
+        form_row.addWidget(QtWidgets.QLabel("Card oracle_id:"))
+        self._lent_oracle_id = QtWidgets.QLineEdit()
+        self._lent_oracle_id.setPlaceholderText("e.g., abc12345-...")
+        form_row.addWidget(self._lent_oracle_id, 2)
+
+        form_row.addWidget(QtWidgets.QLabel("Qty:"))
+        self._lent_quantity = QtWidgets.QSpinBox()
+        self._lent_quantity.setMinimum(1)
+        self._lent_quantity.setMaximum(999)
+        self._lent_quantity.setValue(1)
+        form_row.addWidget(self._lent_quantity)
+
+        form_row.addWidget(QtWidgets.QLabel("Borrower:"))
+        self._lent_borrower = QtWidgets.QLineEdit()
+        self._lent_borrower.setPlaceholderText("Name of person")
+        form_row.addWidget(self._lent_borrower, 2)
+
+        form_row.addWidget(QtWidgets.QLabel("Date:"))
+        self._lent_date = QtWidgets.QDateEdit()
+        self._lent_date.setCalendarPopup(True)
+        self._lent_date.setDate(QtCore.QDate.currentDate())
+        self._lent_date.setDisplayFormat("yyyy-MM-dd")
+        form_row.addWidget(self._lent_date)
+
+        add_btn = QtWidgets.QPushButton("Add Lent Card")
+        add_btn.clicked.connect(self._add_lent_card)
+        form_row.addWidget(add_btn)
+
+        # --- Notes field ---
+        notes_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(notes_row)
+        notes_row.addWidget(QtWidgets.QLabel("Notes:"))
+        self._lent_notes = QtWidgets.QLineEdit()
+        self._lent_notes.setPlaceholderText("Optional notes about this lent card")
+        notes_row.addWidget(self._lent_notes)
+
+        # --- Lent cards table ---
+        self._lent_table = QtWidgets.QTableWidget(0, 7)
+        self._lent_table.setHorizontalHeaderLabels(["ID", "Card", "Qty", "Borrower", "Lent Date", "Returned", "Actions"])
+        self._lent_table.horizontalHeader().setStretchLastSection(True)
+        self._lent_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        layout.addWidget(self._lent_table, 2)
+
+        # --- Bottom row ---
+        bottom_row = QtWidgets.QHBoxLayout()
+        layout.addLayout(bottom_row)
+
+        self._lent_show_returned = QtWidgets.QCheckBox("Show returned cards")
+        self._lent_show_returned.stateChanged.connect(self.refresh_lent_cards)
+        bottom_row.addWidget(self._lent_show_returned)
+
+        bottom_row.addStretch(1)
+
+        refresh = QtWidgets.QPushButton("Refresh")
+        refresh.clicked.connect(self.refresh_lent_cards)
+        bottom_row.addWidget(refresh)
+
+        # Cache of lent data
+        self._lent_rows: list[dict] = []
 
     def _choose_csv(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Choose CSV", "", "CSV Files (*.csv);;All Files (*)")
@@ -274,9 +345,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def refresh_collection(self) -> None:
         rows = self._db.list_collection()
+        lent_summary = self._db.get_lent_summary_by_oracle_id()
         self._collection_rows = [
-            {"name": str(r["name"]), "quantity": int(r["quantity"]),
-             "oracle_id": str(r["oracle_id"]), "scryfall_uri": str(r["scryfall_uri"])}
+            {
+                "name": str(r["name"]), 
+                "quantity": int(r["quantity"]),
+                "oracle_id": str(r["oracle_id"]), 
+                "scryfall_uri": str(r["scryfall_uri"]),
+                "lent_qty": lent_summary.get(str(r["oracle_id"]), (0, []))[0],
+            }
             for r in rows
         ]
         self._apply_collection_sort_and_filter()
@@ -299,6 +376,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if sort_col == "Quantity":
             filtered.sort(key=lambda r: r["quantity"], reverse=reverse)
+        elif sort_col == "Lent":
+            filtered.sort(key=lambda r: r.get("lent_qty", 0), reverse=reverse)
+        elif sort_col == "Available":
+            filtered.sort(key=lambda r: r["quantity"] - r.get("lent_qty", 0), reverse=reverse)
         else:
             filtered.sort(key=lambda r: r["name"].casefold(), reverse=reverse)
 
@@ -308,12 +389,31 @@ class MainWindow(QtWidgets.QMainWindow):
         for r, row in enumerate(filtered):
             self._collection_table.setItem(r, 0, QtWidgets.QTableWidgetItem(row["name"]))
 
-            qty_item = QtWidgets.QTableWidgetItem()
-            qty_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, row["quantity"])
-            self._collection_table.setItem(r, 1, qty_item)
+            owned_item = QtWidgets.QTableWidgetItem()
+            owned_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, row["quantity"])
+            self._collection_table.setItem(r, 1, owned_item)
 
-            self._collection_table.setItem(r, 2, QtWidgets.QTableWidgetItem(row["oracle_id"]))
-            self._collection_table.setItem(r, 3, QtWidgets.QTableWidgetItem(row["scryfall_uri"]))
+            lent_qty = row.get("lent_qty", 0)
+            lent_item = QtWidgets.QTableWidgetItem()
+            lent_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, lent_qty)
+            self._collection_table.setItem(r, 2, lent_item)
+
+            available = row["quantity"] - lent_qty
+            avail_item = QtWidgets.QTableWidgetItem()
+            avail_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, available)
+            self._collection_table.setItem(r, 3, avail_item)
+
+            # Actions column with Lent button
+            actions_widget = QtWidgets.QWidget()
+            actions_layout = QtWidgets.QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(2, 2, 2, 2)
+            
+            lent_btn = QtWidgets.QPushButton("Lent")
+            lent_btn.clicked.connect(lambda checked, oid=row["oracle_id"], name=row["name"]: self._quick_lent_dialog(oid, name))
+            actions_layout.addWidget(lent_btn)
+            
+            actions_layout.addStretch(1)
+            self._collection_table.setCellWidget(r, 4, actions_widget)
         self._collection_table.setSortingEnabled(True)
 
         # Update status
@@ -323,6 +423,70 @@ class MainWindow(QtWidgets.QMainWindow):
             self._collection_count_label.setText(f"Showing {shown} of {total} cards")
         else:
             self._collection_count_label.setText(f"{total} cards")
+
+    def _quick_lent_dialog(self, oracle_id: str, card_name: str) -> None:
+        """Open a simple dialog to quickly mark a card as lent from the collection view."""
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(f"Lend: {card_name}")
+        layout = QtWidgets.QVBoxLayout(dialog)
+        
+        form = QtWidgets.QFormLayout()
+        
+        oracle_display = QtWidgets.QLineEdit(oracle_id)
+        oracle_display.setReadOnly(True)
+        form.addRow("Oracle ID:", oracle_display)
+        
+        qty_spin = QtWidgets.QSpinBox()
+        qty_spin.setMinimum(1)
+        qty_spin.setMaximum(999)
+        qty_spin.setValue(1)
+        form.addRow("Quantity:", qty_spin)
+        
+        borrower_input = QtWidgets.QLineEdit()
+        borrower_input.setPlaceholderText("Who are you lending to?")
+        form.addRow("Borrower:", borrower_input)
+        
+        date_edit = QtWidgets.QDateEdit()
+        date_edit.setCalendarPopup(True)
+        date_edit.setDate(QtCore.QDate.currentDate())
+        date_edit.setDisplayFormat("yyyy-MM-dd")
+        form.addRow("Date:", date_edit)
+        
+        notes_input = QtWidgets.QLineEdit()
+        notes_input.setPlaceholderText("Optional notes")
+        form.addRow("Notes:", notes_input)
+        
+        layout.addLayout(form)
+        
+        buttons = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            quantity = qty_spin.value()
+            borrower_name = borrower_input.text().strip()
+            if not borrower_name:
+                QtWidgets.QMessageBox.warning(self, "Validation error", "Please enter a borrower name.")
+                return
+            lent_date = date_edit.date().toString("yyyy-MM-dd")
+            notes = notes_input.text().strip()
+            
+            try:
+                self._db.lend_card(
+                    oracle_id=oracle_id,
+                    quantity=quantity,
+                    borrower_name=borrower_name,
+                    lent_date=lent_date,
+                    notes=notes,
+                )
+                self.refresh_collection()
+                self.refresh_lent_cards()
+                QtWidgets.QMessageBox.information(self, "Success", f"Lent {quantity}x {card_name} to {borrower_name}.")
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to lend card:\n{e}")
 
     def _compute_deck_compare(self) -> None:
         self._deck_out.setRowCount(0)
@@ -458,6 +622,109 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.information(self, "Export complete", f"Exported to {path}")
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Export failed", f"Failed to write CSV:\n{e}")
+
+    def _add_lent_card(self) -> None:
+        oracle_id = self._lent_oracle_id.text().strip()
+        quantity = self._lent_quantity.value()
+        borrower_name = self._lent_borrower.text().strip()
+        lent_date = self._lent_date.date().toString("yyyy-MM-dd")
+        notes = self._lent_notes.text().strip()
+
+        if not oracle_id:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Please enter an oracle_id.")
+            return
+        if not borrower_name:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Please enter a borrower name.")
+            return
+
+        try:
+            self._db.lend_card(
+                oracle_id=oracle_id,
+                quantity=quantity,
+                borrower_name=borrower_name,
+                lent_date=lent_date,
+                notes=notes,
+            )
+            self._lent_oracle_id.clear()
+            self._lent_borrower.clear()
+            self._lent_notes.clear()
+            self._lent_quantity.setValue(1)
+            self.refresh_lent_cards()
+            QtWidgets.QMessageBox.information(self, "Success", f"Lent {quantity} card(s) to {borrower_name}.")
+        except ValueError as e:
+            QtWidgets.QMessageBox.warning(self, "Validation error", str(e))
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add lent card:\n{e}")
+
+    def refresh_lent_cards(self) -> None:
+        include_returned = self._lent_show_returned.isChecked()
+        rows = self._db.get_lent_cards(include_returned=include_returned)
+        self._lent_rows = [
+            {
+                "id": int(r["id"]),
+                "oracle_id": str(r["oracle_id"]),
+                "card_name": str(r["card_name"]),
+                "quantity": int(r["quantity"]),
+                "borrower_name": str(r["borrower_name"]),
+                "lent_date": str(r["lent_date"]),
+                "return_date": str(r["return_date"]) if r["return_date"] else "",
+                "notes": str(r["notes"]) if r["notes"] else "",
+            }
+            for r in rows
+        ]
+        self._populate_lent_table()
+
+    def _populate_lent_table(self) -> None:
+        self._lent_table.setRowCount(len(self._lent_rows))
+        for r, row in enumerate(self._lent_rows):
+            self._lent_table.setItem(r, 0, QtWidgets.QTableWidgetItem(str(row["id"])))
+            self._lent_table.setItem(r, 1, QtWidgets.QTableWidgetItem(row["card_name"]))
+
+            qty_item = QtWidgets.QTableWidgetItem(str(row["quantity"]))
+            qty_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, row["quantity"])
+            self._lent_table.setItem(r, 2, qty_item)
+
+            self._lent_table.setItem(r, 3, QtWidgets.QTableWidgetItem(row["borrower_name"]))
+            self._lent_table.setItem(r, 4, QtWidgets.QTableWidgetItem(row["lent_date"]))
+
+            returned_text = row["return_date"] if row["return_date"] else "Not returned"
+            returned_item = QtWidgets.QTableWidgetItem(returned_text)
+            if row["return_date"]:
+                returned_item.setBackground(QtCore.Qt.GlobalColor.lightGray)
+            self._lent_table.setItem(r, 5, returned_item)
+
+            # Actions column with Return button
+            actions_widget = QtWidgets.QWidget()
+            actions_layout = QtWidgets.QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(2, 2, 2, 2)
+
+            if not row["return_date"]:
+                return_btn = QtWidgets.QPushButton("Mark Returned")
+                return_btn.clicked.connect(lambda checked, rid=row["id"]: self._mark_card_returned(rid))
+                actions_layout.addWidget(return_btn)
+            else:
+                label = QtWidgets.QLabel("✓ Returned")
+                label.setStyleSheet("color: green;")
+                actions_layout.addWidget(label)
+
+            actions_layout.addStretch(1)
+            self._lent_table.setCellWidget(r, 6, actions_widget)
+
+    def _mark_card_returned(self, lent_id: int) -> None:
+        return_date = QtCore.QDate.currentDate().toString("yyyy-MM-dd")
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Confirm Return",
+            f"Mark this card as returned on {return_date}?",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
+        )
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            try:
+                self._db.return_card(lent_id=lent_id, return_date=return_date)
+                self.refresh_lent_cards()
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to mark as returned:\n{e}")
 
 
 def run_app() -> None:
