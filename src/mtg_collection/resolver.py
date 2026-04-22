@@ -48,6 +48,16 @@ class BulkOracleIndex:
         by_name: dict[str, ScryfallCard] = {}
         by_scryfall_id: dict[str, ScryfallCard] = {}
 
+        # Pre-bind methods for faster lookup in tight loop
+        normalize = normalize_card_name
+        setdefault_name = by_name.setdefault
+        setdefault_id = by_scryfall_id.setdefault
+
+        for card, scryfall_id in iter_bulk_cards_identity(path):
+            setdefault_name(normalize(card.name), card)
+            if scryfall_id:
+                setdefault_id(scryfall_id.strip().casefold(), card)
+
         for card, scryfall_id in iter_bulk_cards_identity(path):
             by_name.setdefault(normalize_card_name(card.name), card)
             if scryfall_id:

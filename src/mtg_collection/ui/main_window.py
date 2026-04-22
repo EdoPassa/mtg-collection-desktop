@@ -336,9 +336,9 @@ class MainWindow(QtWidgets.QMainWindow):
             CardIdentity(oracle_id=v.oracle_id, name=v.canonical_name, scryfall_uri=v.scryfall_uri)
             for v in self._validated
         ]
-        self._db.upsert_cards(cards)
-        for v in self._validated:
-            self._db.increment_collection(v.oracle_id, v.line.qty)
+        with self._db._conn:  # Single transaction for all operations
+            self._db.upsert_cards(cards)
+            self._db.increment_collection_batch([(v.oracle_id, v.line.qty) for v in self._validated])
 
         self.refresh_collection()
         QtWidgets.QMessageBox.information(self, "Imported", f"Added/updated {len(self._validated)} row(s).")
@@ -348,9 +348,9 @@ class MainWindow(QtWidgets.QMainWindow):
         lent_summary = self._db.get_lent_summary_by_oracle_id()
         self._collection_rows = [
             {
-                "name": str(r["name"]), 
+                "name": str(r["name"]),
                 "quantity": int(r["quantity"]),
-                "oracle_id": str(r["oracle_id"]), 
+                "oracle_id": str(r["oracle_id"]),
                 "scryfall_uri": str(r["scryfall_uri"]),
                 "lent_qty": lent_summary.get(str(r["oracle_id"]), (0, []))[0],
             }
@@ -407,11 +407,11 @@ class MainWindow(QtWidgets.QMainWindow):
             actions_widget = QtWidgets.QWidget()
             actions_layout = QtWidgets.QHBoxLayout(actions_widget)
             actions_layout.setContentsMargins(2, 2, 2, 2)
-            
+
             lent_btn = QtWidgets.QPushButton("Lent")
             lent_btn.clicked.connect(lambda checked, oid=row["oracle_id"], name=row["name"]: self._quick_lent_dialog(oid, name))
             actions_layout.addWidget(lent_btn)
-            
+
             actions_layout.addStretch(1)
             self._collection_table.setCellWidget(r, 4, actions_widget)
         self._collection_table.setSortingEnabled(True)
@@ -429,42 +429,42 @@ class MainWindow(QtWidgets.QMainWindow):
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle(f"Lend: {card_name}")
         layout = QtWidgets.QVBoxLayout(dialog)
-        
+
         form = QtWidgets.QFormLayout()
-        
+
         oracle_display = QtWidgets.QLineEdit(oracle_id)
         oracle_display.setReadOnly(True)
         form.addRow("Oracle ID:", oracle_display)
-        
+
         qty_spin = QtWidgets.QSpinBox()
         qty_spin.setMinimum(1)
         qty_spin.setMaximum(999)
         qty_spin.setValue(1)
         form.addRow("Quantity:", qty_spin)
-        
+
         borrower_input = QtWidgets.QLineEdit()
         borrower_input.setPlaceholderText("Who are you lending to?")
         form.addRow("Borrower:", borrower_input)
-        
+
         date_edit = QtWidgets.QDateEdit()
         date_edit.setCalendarPopup(True)
         date_edit.setDate(QtCore.QDate.currentDate())
         date_edit.setDisplayFormat("yyyy-MM-dd")
         form.addRow("Date:", date_edit)
-        
+
         notes_input = QtWidgets.QLineEdit()
         notes_input.setPlaceholderText("Optional notes")
         form.addRow("Notes:", notes_input)
-        
+
         layout.addLayout(form)
-        
+
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
         )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
-        
+
         if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             quantity = qty_spin.value()
             borrower_name = borrower_input.text().strip()
@@ -473,7 +473,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
             lent_date = date_edit.date().toString("yyyy-MM-dd")
             notes = notes_input.text().strip()
-            
+
             try:
                 self._db.lend_card(
                     oracle_id=oracle_id,

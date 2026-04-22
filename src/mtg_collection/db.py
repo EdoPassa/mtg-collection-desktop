@@ -78,6 +78,19 @@ class CollectionDb:
         )
         self._conn.commit()
 
+    def increment_collection_batch(self, items: Iterable[tuple[str, int]]) -> None:
+        """Batch version of increment_collection for better performance."""
+        self._conn.executemany(
+            """
+            INSERT INTO collection_items (oracle_id, quantity)
+            VALUES (?, ?)
+            ON CONFLICT(oracle_id) DO UPDATE SET
+              quantity = quantity + excluded.quantity
+            """,
+            items,
+        )
+        self._conn.commit()
+
     def increment_collection(self, oracle_id: str, qty: int) -> None:
         if qty <= 0:
             return
@@ -209,7 +222,7 @@ class CollectionDb:
     def lend_card(self, *, oracle_id: str, quantity: int, borrower_name: str, lent_date: str, notes: str = "") -> None:
         """
         Record that cards have been lent to someone.
-        
+
         - Adds a new entry in the lent_cards table
         - Does NOT automatically reduce collection quantity (user manages this separately if desired)
         """
@@ -217,7 +230,7 @@ class CollectionDb:
             raise ValueError("quantity must be > 0")
         if not borrower_name.strip():
             raise ValueError("borrower_name cannot be empty")
-        
+
         self._conn.execute(
             """
             INSERT INTO lent_cards (oracle_id, quantity, borrower_name, lent_date, notes)
@@ -244,13 +257,13 @@ class CollectionDb:
     def get_lent_cards(self, include_returned: bool = False) -> list[sqlite3.Row]:
         """
         Get all lent cards, optionally including those that have been returned.
-        
+
         Returns rows with: id, oracle_id, card_name, quantity, borrower_name, lent_date, return_date, notes
         """
         if include_returned:
             cur = self._conn.execute(
                 """
-                SELECT lc.id, lc.oracle_id, c.name AS card_name, lc.quantity, 
+                SELECT lc.id, lc.oracle_id, c.name AS card_name, lc.quantity,
                        lc.borrower_name, lc.lent_date, lc.return_date, lc.notes
                 FROM lent_cards lc
                 JOIN cards c ON c.oracle_id = lc.oracle_id
@@ -260,7 +273,7 @@ class CollectionDb:
         else:
             cur = self._conn.execute(
                 """
-                SELECT lc.id, lc.oracle_id, c.name AS card_name, lc.quantity, 
+                SELECT lc.id, lc.oracle_id, c.name AS card_name, lc.quantity,
                        lc.borrower_name, lc.lent_date, lc.return_date, lc.notes
                 FROM lent_cards lc
                 JOIN cards c ON c.oracle_id = lc.oracle_id
@@ -273,7 +286,7 @@ class CollectionDb:
     def get_lent_summary_by_oracle_id(self) -> dict[str, tuple[int, list[str]]]:
         """
         Get a summary of lent quantities per oracle_id.
-        
+
         Returns: {oracle_id: (total_lent_quantity, [borrower_names])}
         Only includes currently lent (not returned) cards.
         """

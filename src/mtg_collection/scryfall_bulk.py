@@ -225,7 +225,8 @@ def iter_bulk_cards_minimal(path: Path) -> Iterable[ScryfallCard]:
 
     with open_bulk_json(path) as f:
         if ijson is not None:
-            for obj in ijson.items(f, "item"):
+            items_iter = ijson.items(f, "item")
+            for obj in items_iter:
                 if not isinstance(obj, dict):
                     continue
                 yield _bulk_obj_to_card(obj)
@@ -251,10 +252,13 @@ def iter_bulk_cards_identity(path: Path) -> Iterable[tuple[ScryfallCard, str | N
 
     with open_bulk_json(path) as f:
         if ijson is not None:
-            for obj in ijson.items(f, "item"):
+            # Pre-bind methods for faster lookup in tight loop
+            items_iter = ijson.items(f, "item")
+            for obj in items_iter:
                 if not isinstance(obj, dict):
                     continue
-                yield _bulk_obj_to_card(obj), (obj.get("id") if isinstance(obj.get("id"), str) else None)
+                scryfall_id = obj.get("id") if isinstance(obj.get("id"), str) else None
+                yield _bulk_obj_to_card(obj), scryfall_id
             return
 
         data = json.load(f)
@@ -263,7 +267,8 @@ def iter_bulk_cards_identity(path: Path) -> Iterable[tuple[ScryfallCard, str | N
         for obj in data:
             if not isinstance(obj, dict):
                 continue
-            yield _bulk_obj_to_card(obj), (obj.get("id") if isinstance(obj.get("id"), str) else None)
+            scryfall_id = obj.get("id") if isinstance(obj.get("id"), str) else None
+            yield _bulk_obj_to_card(obj), scryfall_id
 
 
 def _bulk_obj_to_card(obj: dict[str, Any]) -> ScryfallCard:
