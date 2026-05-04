@@ -38,8 +38,8 @@ def build_collection_tab(window: Any, tab: QtWidgets.QWidget) -> None:
     window._collection_sort_col.currentTextChanged.connect(lambda _: window._apply_collection_sort_and_filter())
     window._collection_sort_order.currentTextChanged.connect(lambda _: window._apply_collection_sort_and_filter())
 
-    window._collection_table = QtWidgets.QTableWidget(0, 5)
-    window._collection_table.setHorizontalHeaderLabels(["Card", "Owned", "Lent", "Available", "Actions"])
+    window._collection_table = QtWidgets.QTableWidget(0, 6)
+    window._collection_table.setHorizontalHeaderLabels(["Card", "Owned", "Lent", "Available", "In deck", "Actions"])
     configure_table(window._collection_table)
     window._collection_table.setSortingEnabled(True)
     window._collection_table.horizontalHeader().setSortIndicatorShown(True)

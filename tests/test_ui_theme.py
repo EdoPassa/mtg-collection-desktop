@@ -53,11 +53,13 @@ class ThemeTests(unittest.TestCase):
 class TabExtractionTests(unittest.TestCase):
     def test_tab_builder_modules_are_importable(self) -> None:
         from mtg_collection.ui.tabs.collection_tab import build_collection_tab
+        from mtg_collection.ui.tabs.deck_builder_tab import build_deck_builder_tab
         from mtg_collection.ui.tabs.deck_tab import build_deck_tab
         from mtg_collection.ui.tabs.import_tab import build_import_tab
         from mtg_collection.ui.tabs.lent_tab import build_lent_tab
 
         self.assertTrue(callable(build_collection_tab))
+        self.assertTrue(callable(build_deck_builder_tab))
         self.assertTrue(callable(build_deck_tab))
         self.assertTrue(callable(build_import_tab))
         self.assertTrue(callable(build_lent_tab))
@@ -70,6 +72,7 @@ class TabBuilderAccessibilityTests(unittest.TestCase):
 
     def test_key_controls_have_accessible_names(self) -> None:
         from mtg_collection.ui.tabs.collection_tab import build_collection_tab
+        from mtg_collection.ui.tabs.deck_builder_tab import build_deck_builder_tab
         from mtg_collection.ui.tabs.deck_tab import build_deck_tab
         from mtg_collection.ui.tabs.import_tab import build_import_tab
         from mtg_collection.ui.tabs.lent_tab import build_lent_tab
@@ -105,6 +108,15 @@ class TabBuilderAccessibilityTests(unittest.TestCase):
             def _export_deck_compare(self) -> None:
                 pass
 
+            def _create_deck(self) -> None:
+                pass
+
+            def _refresh_selected_deck_cards(self) -> None:
+                pass
+
+            def _add_card_to_selected_deck(self) -> None:
+                pass
+
             def _add_lent_card(self) -> None:
                 pass
 
@@ -112,11 +124,12 @@ class TabBuilderAccessibilityTests(unittest.TestCase):
                 pass
 
         owner = Owner()
-        tabs = [QtWidgets.QWidget() for _ in range(4)]
+        tabs = [QtWidgets.QWidget() for _ in range(5)]
         build_import_tab(owner, tabs[0])
         build_collection_tab(owner, tabs[1])
         build_deck_tab(owner, tabs[2])
-        build_lent_tab(owner, tabs[3])
+        build_deck_builder_tab(owner, tabs[3])
+        build_lent_tab(owner, tabs[4])
 
         self.assertEqual(owner._commit_btn.accessibleName(), "Add validated cards to collection")
         self.assertEqual(owner._import_mode.accessibleName(), "Import source mode")
@@ -125,6 +138,10 @@ class TabBuilderAccessibilityTests(unittest.TestCase):
         self.assertEqual(owner._collection_sort_order.accessibleName(), "Collection sort order")
         self.assertEqual(owner._deck_input.accessibleName(), "Target decklist input")
         self.assertEqual(owner._deck_filter.accessibleName(), "Deck comparison filter")
+        self.assertEqual(owner._deck_builder_name.accessibleName(), "New deck name")
+        self.assertEqual(owner._deck_builder_selector.accessibleName(), "Saved deck selector")
+        self.assertEqual(owner._deck_builder_card_name.accessibleName(), "Deck card name")
+        self.assertEqual(owner._deck_builder_quantity.accessibleName(), "Deck card quantity")
         self.assertEqual(owner._lent_borrower.accessibleName(), "Borrower name")
         self.assertEqual(owner._lent_quantity.accessibleName(), "Lent quantity")
         self.assertEqual(owner._lent_date.accessibleName(), "Lent date")
@@ -147,6 +164,20 @@ class MainWindowSmokeTests(unittest.TestCase):
                         "quantity": 4,
                         "oracle_id": "oracle-1",
                         "scryfall_uri": "https://example.test/card",
+                        "in_deck": 1,
+                    }
+                ]
+
+            def list_decks(self) -> list[dict[str, object]]:
+                return [{"id": 2, "name": "Burn"}]
+
+            def list_deck_cards(self, deck_id: int) -> list[dict[str, object]]:
+                return [
+                    {
+                        "oracle_id": "oracle-1",
+                        "name": "Lightning Bolt",
+                        "scryfall_uri": "https://example.test/card",
+                        "quantity": 4,
                     }
                 ]
 
@@ -169,13 +200,16 @@ class MainWindowSmokeTests(unittest.TestCase):
 
         window = MainWindow(FakeDb(), object())
 
-        self.assertEqual(window._tabs.count(), 4)
-        self.assertEqual([window._tabs.tabText(i) for i in range(window._tabs.count())], ["Import", "Collection", "Deck compare", "Lent cards"])
+        self.assertEqual(window._tabs.count(), 5)
+        self.assertEqual([window._tabs.tabText(i) for i in range(window._tabs.count())], ["Import", "Collection", "Deck compare", "Deck builder", "Lent cards"])
         self.assertFalse(window._commit_btn.isEnabled())
         self.assertFalse(window._deck_repair_btn.isEnabled())
         self.assertFalse(window._deck_export_btn.isEnabled())
+        self.assertEqual(window._deck_builder_selector.currentText(), "Burn")
+        self.assertEqual(window._deck_builder_cards.rowCount(), 1)
+        self.assertEqual(window._collection_table.item(0, 4).text(), "Yes")
 
-        collection_action = window._collection_table.cellWidget(0, 4).findChild(QtWidgets.QPushButton)
+        collection_action = window._collection_table.cellWidget(0, 5).findChild(QtWidgets.QPushButton)
         lent_action = window._lent_table.cellWidget(0, 6).findChild(QtWidgets.QPushButton)
 
         self.assertEqual(collection_action.accessibleName(), "Lend Lightning Bolt")

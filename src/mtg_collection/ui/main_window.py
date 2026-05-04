@@ -10,6 +10,7 @@ from mtg_collection.importer import ImportLine, parse_csv_bytes, parse_txt
 from mtg_collection.resolver import ApiOnlyResolver, CardResolver, ResolveResult, build_default_bulk_first_resolver, normalize_card_name
 from mtg_collection.scryfall import ScryfallClient, ScryfallError
 from mtg_collection.ui.tabs.collection_tab import build_collection_tab
+from mtg_collection.ui.tabs.deck_builder_tab import build_deck_builder_tab
 from mtg_collection.ui.tabs.deck_tab import build_deck_tab
 from mtg_collection.ui.tabs.import_tab import build_import_tab
 from mtg_collection.ui.tabs.lent_tab import build_lent_tab
@@ -39,18 +40,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self._import_tab = QtWidgets.QWidget()
         self._collection_tab = QtWidgets.QWidget()
         self._deck_tab = QtWidgets.QWidget()
+        self._deck_builder_tab = QtWidgets.QWidget()
         self._lent_tab = QtWidgets.QWidget()
 
         self._tabs.addTab(self._import_tab, "Import")
         self._tabs.addTab(self._collection_tab, "Collection")
         self._tabs.addTab(self._deck_tab, "Deck compare")
+        self._tabs.addTab(self._deck_builder_tab, "Deck builder")
         self._tabs.addTab(self._lent_tab, "Lent cards")
 
         self._build_import_tab()
         self._build_collection_tab()
         self._build_deck_tab()
+        self._build_deck_builder_tab()
         self._build_lent_tab()
 
+        self._refresh_decks()
         self.refresh_collection()
         self.refresh_lent_cards()
 
@@ -64,6 +69,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _build_deck_tab(self) -> None:
         build_deck_tab(self, self._deck_tab)
+
+    def _build_deck_builder_tab(self) -> None:
+        build_deck_builder_tab(self, self._deck_builder_tab)
 
     def _build_lent_tab(self) -> None:
         build_lent_tab(self, self._lent_tab)
@@ -160,6 +168,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "oracle_id": str(r["oracle_id"]),
                 "scryfall_uri": str(r["scryfall_uri"]),
                 "lent_qty": lent_summary.get(str(r["oracle_id"]), (0, []))[0],
+                "in_deck": bool(r["in_deck"]) if "in_deck" in r.keys() else False,
             }
             for r in rows
         ]
@@ -210,6 +219,9 @@ class MainWindow(QtWidgets.QMainWindow):
             avail_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, available)
             self._collection_table.setItem(r, 3, avail_item)
 
+            in_deck_item = QtWidgets.QTableWidgetItem("Yes" if row.get("in_deck", False) else "No")
+            self._collection_table.setItem(r, 4, in_deck_item)
+
             # Actions column with Lent button
             actions_widget = QtWidgets.QWidget()
             actions_layout = compact_actions_layout(actions_widget)
@@ -220,7 +232,7 @@ class MainWindow(QtWidgets.QMainWindow):
             actions_layout.addWidget(lent_btn)
 
             actions_layout.addStretch(1)
-            self._collection_table.setCellWidget(r, 4, actions_widget)
+            self._collection_table.setCellWidget(r, 5, actions_widget)
         self._collection_table.setSortingEnabled(True)
 
         # Update status
@@ -230,6 +242,87 @@ class MainWindow(QtWidgets.QMainWindow):
             self._collection_count_label.setText(f"Showing {shown} of {total} cards")
         else:
             self._collection_count_label.setText(f"{total} cards")
+
+    def _create_deck(self) -> None:
+        name = self._deck_builder_name.text().strip()
+        if not name:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Please enter a deck name.")
+            return
+
+        try:
+            deck_id = self._db.create_deck(name)
+        except ValueError as e:
+            QtWidgets.QMessageBox.warning(self, "Validation error", str(e))
+            return
+
+        self._deck_builder_name.clear()
+        self._refresh_decks(select_deck_id=deck_id)
+        self._deck_builder_status.setPlainText(f"Created deck: {name}")
+
+    def _refresh_decks(self, *, select_deck_id: int | None = None) -> None:
+        decks = self._db.list_decks()
+        selector = self._deck_builder_selector
+        selector.blockSignals(True)
+        selector.clear()
+        selected_index = -1
+        for index, row in enumerate(decks):
+            deck_id = int(row["id"])
+            selector.addItem(str(row["name"]), deck_id)
+            if select_deck_id is not None and deck_id == select_deck_id:
+                selected_index = index
+        if selected_index >= 0:
+            selector.setCurrentIndex(selected_index)
+        selector.blockSignals(False)
+        self._refresh_selected_deck_cards()
+
+    def _refresh_selected_deck_cards(self) -> None:
+        deck_id = self._deck_builder_selector.currentData()
+        self._deck_builder_cards.setRowCount(0)
+        if deck_id is None:
+            self._deck_builder_status.setPlainText("Create a deck to start adding cards.")
+            return
+
+        rows = self._db.list_deck_cards(int(deck_id))
+        self._deck_builder_cards.setRowCount(len(rows))
+        for r, row in enumerate(rows):
+            self._deck_builder_cards.setItem(r, 0, QtWidgets.QTableWidgetItem(str(row["name"])))
+            qty_item = QtWidgets.QTableWidgetItem()
+            qty_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, int(row["quantity"]))
+            self._deck_builder_cards.setItem(r, 1, qty_item)
+
+    def _add_card_to_selected_deck(self) -> None:
+        deck_id = self._deck_builder_selector.currentData()
+        if deck_id is None:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Create or select a deck first.")
+            return
+
+        card_name = self._deck_builder_card_name.text().strip()
+        if not card_name:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Please enter a card name.")
+            return
+
+        try:
+            resolved = self._resolver.resolve_name(card_name)
+            card = resolved.card
+            identity = CardIdentity(
+                oracle_id=card.oracle_id,
+                name=card.name,
+                scryfall_uri=card.scryfall_uri,
+            )
+            quantity = self._deck_builder_quantity.value()
+            self._db.add_card_to_deck(int(deck_id), identity, quantity)
+        except ScryfallError as e:
+            self._deck_builder_status.setPlainText(f"Could not resolve {card_name!r}: {e}")
+            return
+        except ValueError as e:
+            QtWidgets.QMessageBox.warning(self, "Validation error", str(e))
+            return
+
+        self._deck_builder_card_name.clear()
+        self._deck_builder_quantity.setValue(1)
+        self._refresh_selected_deck_cards()
+        self.refresh_collection()
+        self._deck_builder_status.setPlainText(f"Added {quantity}x {identity.name}.")
 
     def _quick_lent_dialog(self, oracle_id: str, card_name: str) -> None:
         """Open a simple dialog to quickly mark a card as lent from the collection view."""

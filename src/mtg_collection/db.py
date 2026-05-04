@@ -26,6 +26,20 @@ CREATE TABLE IF NOT EXISTS collection_items (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_collection_oracle_id ON collection_items(oracle_id);
 
+CREATE TABLE IF NOT EXISTS decks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS deck_cards (
+  deck_id INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+  oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  PRIMARY KEY (deck_id, oracle_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_deck_cards_oracle_id ON deck_cards(oracle_id);
+
 CREATE TABLE IF NOT EXISTS lent_cards (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE CASCADE,
@@ -122,11 +136,87 @@ class CollectionDb:
     def list_collection(self) -> list[sqlite3.Row]:
         cur = self._conn.execute(
             """
-            SELECT ci.oracle_id, c.name, ci.quantity, c.scryfall_uri
+            SELECT ci.oracle_id, c.name, ci.quantity, c.scryfall_uri,
+                   CASE
+                     WHEN EXISTS (
+                       SELECT 1
+                       FROM deck_cards dc
+                       WHERE dc.oracle_id = ci.oracle_id
+                     )
+                     THEN 1
+                     ELSE 0
+                   END AS in_deck
             FROM collection_items ci
             JOIN cards c ON c.oracle_id = ci.oracle_id
             ORDER BY c.name COLLATE NOCASE
             """
+        )
+        return list(cur.fetchall())
+
+    def create_deck(self, name: str) -> int:
+        deck_name = name.strip()
+        if not deck_name:
+            raise ValueError("deck name cannot be empty")
+        try:
+            cur = self._conn.execute(
+                """
+                INSERT INTO decks (name)
+                VALUES (?)
+                """,
+                (deck_name,),
+            )
+        except sqlite3.IntegrityError as e:
+            raise ValueError(f"deck already exists: {deck_name}") from e
+        self._conn.commit()
+        return int(cur.lastrowid)
+
+    def list_decks(self) -> list[sqlite3.Row]:
+        cur = self._conn.execute(
+            """
+            SELECT id, name
+            FROM decks
+            ORDER BY name COLLATE NOCASE
+            """
+        )
+        return list(cur.fetchall())
+
+    def add_card_to_deck(self, deck_id: int, card: CardIdentity, qty: int) -> None:
+        if qty <= 0:
+            raise ValueError("quantity must be > 0")
+        try:
+            with self._conn:
+                self._conn.execute(
+                    """
+                    INSERT INTO cards (oracle_id, name, scryfall_uri)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(oracle_id) DO UPDATE SET
+                      name = excluded.name,
+                      scryfall_uri = excluded.scryfall_uri
+                    """,
+                    (card.oracle_id, card.name, card.scryfall_uri),
+                )
+                self._conn.execute(
+                    """
+                    INSERT INTO deck_cards (deck_id, oracle_id, quantity)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(deck_id, oracle_id) DO UPDATE SET
+                      quantity = quantity + excluded.quantity
+                    """,
+                    (deck_id, card.oracle_id, qty),
+                )
+        except sqlite3.IntegrityError as e:
+            raise ValueError("deck does not exist") from e
+
+    def list_deck_cards(self, deck_id: int) -> list[sqlite3.Row]:
+        cur = self._conn.execute(
+            """
+            SELECT dc.oracle_id, c.name, c.scryfall_uri, dc.quantity
+            FROM deck_cards dc
+            JOIN cards c ON c.oracle_id = dc.oracle_id
+            WHERE dc.deck_id = ?
+            ORDER BY c.name COLLATE NOCASE
+            """,
+            (deck_id,),
         )
         return list(cur.fetchall())
 
