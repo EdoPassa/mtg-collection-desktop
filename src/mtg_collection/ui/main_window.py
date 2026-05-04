@@ -805,7 +805,6 @@ def run_app() -> None:
     thread.finished.connect(controller.on_thread_finished, QtCore.Qt.ConnectionType.QueuedConnection)
 
     thread.finished.connect(worker.deleteLater)
-    thread.finished.connect(thread.deleteLater)
     thread.start()
     try:
         app.exec()
