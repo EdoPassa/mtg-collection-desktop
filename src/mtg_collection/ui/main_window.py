@@ -3,12 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from mtg_collection.db import CardIdentity, CollectionDb
 from mtg_collection.importer import ImportLine, parse_csv_bytes, parse_txt
 from mtg_collection.resolver import ApiOnlyResolver, CardResolver, ResolveResult, build_default_bulk_first_resolver, normalize_card_name
 from mtg_collection.scryfall import ScryfallClient, ScryfallError
+from mtg_collection.ui.tabs.collection_tab import build_collection_tab
+from mtg_collection.ui.tabs.deck_tab import build_deck_tab
+from mtg_collection.ui.tabs.import_tab import build_import_tab
+from mtg_collection.ui.tabs.lent_tab import build_lent_tab
+from mtg_collection.ui.theme import DEFAULT_TOKENS, apply_global_theme
+from mtg_collection.ui.theme.widgets import action_button, compact_actions_layout, status_label
 
 
 @dataclass(frozen=True)
@@ -51,215 +57,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self._deck_last_mismatches: list[tuple[str, CardIdentity]] = []
 
     def _build_import_tab(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self._import_tab)
-
-        top_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(top_row)
-
-        self._import_mode = QtWidgets.QComboBox()
-        self._import_mode.addItems(["TXT (paste)", "CSV (file)"])
-        top_row.addWidget(QtWidgets.QLabel("Source"))
-        top_row.addWidget(self._import_mode)
-        top_row.addStretch(1)
-
-        self._csv_btn = QtWidgets.QPushButton("Choose CSV…")
-        self._csv_btn.clicked.connect(self._choose_csv)
-        top_row.addWidget(self._csv_btn)
-
-        self._validate_btn = QtWidgets.QPushButton("Validate")
-        self._validate_btn.clicked.connect(self._validate_import)
-        top_row.addWidget(self._validate_btn)
-
-        self._commit_btn = QtWidgets.QPushButton("Add to collection")
-        self._commit_btn.setEnabled(False)
-        self._commit_btn.clicked.connect(self._commit_validated)
-        top_row.addWidget(self._commit_btn)
-
-        self._input = QtWidgets.QPlainTextEdit()
-        self._input.setPlaceholderText("Paste lines like:\n4 Lightning Bolt\n2x Opt\nLightning Bolt x4")
-        layout.addWidget(self._input, 2)
-
-        splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical)
-        layout.addWidget(splitter, 3)
-
-        self._results = QtWidgets.QTableWidget(0, 5)
-        self._results.setHorizontalHeaderLabels(["Qty", "Input name", "Matched name", "Oracle ID", "Scryfall"])
-        self._results.horizontalHeader().setStretchLastSection(True)
-        self._results.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        splitter.addWidget(self._results)
-
-        self._unresolved = QtWidgets.QPlainTextEdit()
-        self._unresolved.setReadOnly(True)
-        self._unresolved.setPlaceholderText("Unresolved lines will appear here with reasons.")
-        splitter.addWidget(self._unresolved)
-
-        self._csv_path: Path | None = None
-        self._validated: list[ResolvedLine] = []
+        build_import_tab(self, self._import_tab)
 
     def _build_collection_tab(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self._collection_tab)
-
-        # --- Search bar ---
-        search_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(search_row)
-
-        search_row.addWidget(QtWidgets.QLabel("Search:"))
-        self._collection_search = QtWidgets.QLineEdit()
-        self._collection_search.setPlaceholderText("Filter by card name…")
-        self._collection_search.setClearButtonEnabled(True)
-        self._collection_search.textChanged.connect(self._filter_collection)
-        search_row.addWidget(self._collection_search)
-
-        # --- Sort selector ---
-        search_row.addWidget(QtWidgets.QLabel("Sort by:"))
-        self._collection_sort_col = QtWidgets.QComboBox()
-        self._collection_sort_col.addItems(["Card", "Quantity"])
-        search_row.addWidget(self._collection_sort_col)
-
-        self._collection_sort_order = QtWidgets.QComboBox()
-        self._collection_sort_order.addItems(["Ascending", "Descending"])
-        search_row.addWidget(self._collection_sort_order)
-
-        self._collection_sort_col.currentTextChanged.connect(lambda _: self._apply_collection_sort_and_filter())
-        self._collection_sort_order.currentTextChanged.connect(lambda _: self._apply_collection_sort_and_filter())
-
-        # --- Table ---
-        self._collection_table = QtWidgets.QTableWidget(0, 5)
-        self._collection_table.setHorizontalHeaderLabels(["Card", "Owned", "Lent", "Available", "Actions"])
-        self._collection_table.horizontalHeader().setStretchLastSection(True)
-        self._collection_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._collection_table.setSortingEnabled(True)
-        self._collection_table.horizontalHeader().setSortIndicatorShown(True)
-        layout.addWidget(self._collection_table)
-
-        # --- Bottom row ---
-        bottom_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(bottom_row)
-
-        self._collection_count_label = QtWidgets.QLabel("")
-        bottom_row.addWidget(self._collection_count_label)
-        bottom_row.addStretch(1)
-
-        refresh = QtWidgets.QPushButton("Refresh")
-        refresh.clicked.connect(self.refresh_collection)
-        bottom_row.addWidget(refresh)
-
-        # Cache of raw collection data for filtering
-        self._collection_rows: list[dict] = []
+        build_collection_tab(self, self._collection_tab)
 
     def _build_deck_tab(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self._deck_tab)
-
-        self._deck_input = QtWidgets.QPlainTextEdit()
-        self._deck_input.setPlaceholderText("Paste a target decklist (same TXT format):\n4 Lightning Bolt\n2 Opt")
-        layout.addWidget(self._deck_input, 2)
-
-        btn_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(btn_row)
-        btn_row.addStretch(1)
-
-        self._deck_repair_btn = QtWidgets.QPushButton("Repair mismatches")
-        self._deck_repair_btn.setEnabled(False)
-        self._deck_repair_btn.clicked.connect(self._repair_deck_mismatches)
-        btn_row.addWidget(self._deck_repair_btn)
-
-        btn = QtWidgets.QPushButton("Compute owned vs need")
-        btn.clicked.connect(self._compute_deck_compare)
-        btn_row.addWidget(btn)
-
-        filter_export_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(filter_export_row)
-
-        self._deck_filter = QtWidgets.QComboBox()
-        self._deck_filter.addItems(["All", "Missing cards"])
-        self._deck_filter.currentTextChanged.connect(self._apply_deck_filter)
-        filter_export_row.addWidget(QtWidgets.QLabel("Filter:"))
-        filter_export_row.addWidget(self._deck_filter)
-
-        filter_export_row.addStretch(1)
-
-        self._deck_export_btn = QtWidgets.QPushButton("Export to CSV…")
-        self._deck_export_btn.setEnabled(False)
-        self._deck_export_btn.clicked.connect(self._export_deck_compare)
-        filter_export_row.addWidget(self._deck_export_btn)
-
-        self._deck_out = QtWidgets.QTableWidget(0, 4)
-        self._deck_out.setHorizontalHeaderLabels(["Card", "Needed", "Owned", "Missing"])
-        self._deck_out.horizontalHeader().setStretchLastSection(True)
-        self._deck_out.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        layout.addWidget(self._deck_out, 3)
-
-        self._deck_unresolved = QtWidgets.QPlainTextEdit()
-        self._deck_unresolved.setReadOnly(True)
-        self._deck_unresolved.setPlaceholderText("Unresolved deck lines will appear here.")
-        layout.addWidget(self._deck_unresolved, 1)
+        build_deck_tab(self, self._deck_tab)
 
     def _build_lent_tab(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self._lent_tab)
-
-        # --- Top row: Add lent card form ---
-        form_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(form_row)
-
-        form_row.addWidget(QtWidgets.QLabel("Card oracle_id:"))
-        self._lent_oracle_id = QtWidgets.QLineEdit()
-        self._lent_oracle_id.setPlaceholderText("e.g., abc12345-...")
-        form_row.addWidget(self._lent_oracle_id, 2)
-
-        form_row.addWidget(QtWidgets.QLabel("Qty:"))
-        self._lent_quantity = QtWidgets.QSpinBox()
-        self._lent_quantity.setMinimum(1)
-        self._lent_quantity.setMaximum(999)
-        self._lent_quantity.setValue(1)
-        form_row.addWidget(self._lent_quantity)
-
-        form_row.addWidget(QtWidgets.QLabel("Borrower:"))
-        self._lent_borrower = QtWidgets.QLineEdit()
-        self._lent_borrower.setPlaceholderText("Name of person")
-        form_row.addWidget(self._lent_borrower, 2)
-
-        form_row.addWidget(QtWidgets.QLabel("Date:"))
-        self._lent_date = QtWidgets.QDateEdit()
-        self._lent_date.setCalendarPopup(True)
-        self._lent_date.setDate(QtCore.QDate.currentDate())
-        self._lent_date.setDisplayFormat("yyyy-MM-dd")
-        form_row.addWidget(self._lent_date)
-
-        add_btn = QtWidgets.QPushButton("Add Lent Card")
-        add_btn.clicked.connect(self._add_lent_card)
-        form_row.addWidget(add_btn)
-
-        # --- Notes field ---
-        notes_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(notes_row)
-        notes_row.addWidget(QtWidgets.QLabel("Notes:"))
-        self._lent_notes = QtWidgets.QLineEdit()
-        self._lent_notes.setPlaceholderText("Optional notes about this lent card")
-        notes_row.addWidget(self._lent_notes)
-
-        # --- Lent cards table ---
-        self._lent_table = QtWidgets.QTableWidget(0, 7)
-        self._lent_table.setHorizontalHeaderLabels(["ID", "Card", "Qty", "Borrower", "Lent Date", "Returned", "Actions"])
-        self._lent_table.horizontalHeader().setStretchLastSection(True)
-        self._lent_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        layout.addWidget(self._lent_table, 2)
-
-        # --- Bottom row ---
-        bottom_row = QtWidgets.QHBoxLayout()
-        layout.addLayout(bottom_row)
-
-        self._lent_show_returned = QtWidgets.QCheckBox("Show returned cards")
-        self._lent_show_returned.stateChanged.connect(self.refresh_lent_cards)
-        bottom_row.addWidget(self._lent_show_returned)
-
-        bottom_row.addStretch(1)
-
-        refresh = QtWidgets.QPushButton("Refresh")
-        refresh.clicked.connect(self.refresh_lent_cards)
-        bottom_row.addWidget(refresh)
-
-        # Cache of lent data
-        self._lent_rows: list[dict] = []
+        build_lent_tab(self, self._lent_tab)
 
     def _choose_csv(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Choose CSV", "", "CSV Files (*.csv);;All Files (*)")
@@ -405,10 +212,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # Actions column with Lent button
             actions_widget = QtWidgets.QWidget()
-            actions_layout = QtWidgets.QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(2, 2, 2, 2)
+            actions_layout = compact_actions_layout(actions_widget)
 
-            lent_btn = QtWidgets.QPushButton("Lent")
+            lent_btn = action_button("Lent")
+            lent_btn.setAccessibleName(f"Lend {row['name']}")
             lent_btn.clicked.connect(lambda checked, oid=row["oracle_id"], name=row["name"]: self._quick_lent_dialog(oid, name))
             actions_layout.addWidget(lent_btn)
 
@@ -690,22 +497,26 @@ class MainWindow(QtWidgets.QMainWindow):
             returned_text = row["return_date"] if row["return_date"] else "Not returned"
             returned_item = QtWidgets.QTableWidgetItem(returned_text)
             if row["return_date"]:
-                returned_item.setBackground(QtCore.Qt.GlobalColor.lightGray)
+                returned_item.setBackground(QtGui.QColor(DEFAULT_TOKENS.colors.success_surface))
             self._lent_table.setItem(r, 5, returned_item)
 
             # Actions column with Return button
             actions_widget = QtWidgets.QWidget()
-            actions_layout = QtWidgets.QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(2, 2, 2, 2)
+            actions_layout = compact_actions_layout(actions_widget)
 
             if not row["return_date"]:
-                return_btn = QtWidgets.QPushButton("Mark Returned")
+                return_btn = action_button("Mark returned")
+                return_btn.setAccessibleName(
+                    f"Mark {row['card_name']} lent to {row['borrower_name']} on {row['lent_date']} returned"
+                )
                 return_btn.clicked.connect(lambda checked, rid=row["id"]: self._mark_card_returned(rid))
                 actions_layout.addWidget(return_btn)
             else:
-                label = QtWidgets.QLabel("✓ Returned")
-                label.setStyleSheet("color: green;")
-                actions_layout.addWidget(label)
+                returned_label = status_label("Returned", role="success")
+                returned_label.setAccessibleName(
+                    f"{row['card_name']} lent to {row['borrower_name']} on {row['lent_date']} returned"
+                )
+                actions_layout.addWidget(returned_label)
 
             actions_layout.addStretch(1)
             self._lent_table.setCellWidget(r, 6, actions_widget)
@@ -729,6 +540,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def run_app() -> None:
     app = QtWidgets.QApplication([])
+    apply_global_theme(app)
     db = CollectionDb(Path("data/collection.sqlite3"))
     api = ScryfallClient()
 
