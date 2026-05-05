@@ -20,6 +20,8 @@ htmlcov/
 
 # IDE files
 .vscode/
+.cursor/
+.databricks/
 .idea/
 *.swp
 *.swo
