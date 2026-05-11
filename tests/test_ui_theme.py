@@ -108,6 +108,12 @@ class TabBuilderAccessibilityTests(unittest.TestCase):
             def _export_deck_compare(self) -> None:
                 pass
 
+            def _update_deck_build_mode(self) -> None:
+                pass
+
+            def _build_deck_from_compare(self) -> None:
+                pass
+
             def _create_deck(self) -> None:
                 pass
 
@@ -138,8 +144,10 @@ class TabBuilderAccessibilityTests(unittest.TestCase):
         self.assertEqual(owner._collection_sort_order.accessibleName(), "Collection sort order")
         self.assertEqual(owner._deck_input.accessibleName(), "Target decklist input")
         self.assertEqual(owner._deck_filter.accessibleName(), "Deck comparison filter")
+        self.assertEqual(owner._deck_build_mode.accessibleName(), "Deck build mode")
         self.assertEqual(owner._deck_builder_name.accessibleName(), "New deck name")
         self.assertEqual(owner._deck_builder_selector.accessibleName(), "Saved deck selector")
+        self.assertEqual(owner._deck_build_btn.accessibleName(), "Build deck from compared list")
         self.assertEqual(owner._deck_builder_card_name.accessibleName(), "Deck card name")
         self.assertEqual(owner._deck_builder_quantity.accessibleName(), "Deck card quantity")
         self.assertEqual(owner._lent_borrower.accessibleName(), "Borrower name")
@@ -200,13 +208,13 @@ class MainWindowSmokeTests(unittest.TestCase):
 
         window = MainWindow(FakeDb(), object())
 
-        self.assertEqual(window._tabs.count(), 5)
-        self.assertEqual([window._tabs.tabText(i) for i in range(window._tabs.count())], ["Import", "Collection", "Deck compare", "Deck builder", "Lent cards"])
+        self.assertEqual(window._tabs.count(), 4)
+        self.assertEqual([window._tabs.tabText(i) for i in range(window._tabs.count())], ["Import", "Collection", "Deck compare", "Lent cards"])
         self.assertFalse(window._commit_btn.isEnabled())
         self.assertFalse(window._deck_repair_btn.isEnabled())
         self.assertFalse(window._deck_export_btn.isEnabled())
+        self.assertFalse(window._deck_build_btn.isEnabled())
         self.assertEqual(window._deck_builder_selector.currentText(), "Burn")
-        self.assertEqual(window._deck_builder_cards.rowCount(), 1)
         self.assertEqual(window._collection_table.item(0, 4).text(), "Yes")
 
         collection_action = window._collection_table.cellWidget(0, 5).findChild(QtWidgets.QPushButton)
@@ -214,6 +222,51 @@ class MainWindowSmokeTests(unittest.TestCase):
 
         self.assertEqual(collection_action.accessibleName(), "Lend Lightning Bolt")
         self.assertEqual(lent_action.accessibleName(), "Mark Lightning Bolt lent to Alex on 2026-05-04 returned")
+
+    def test_build_deck_from_compare_creates_deck_from_available_rows(self) -> None:
+        from mtg_collection.db import CardIdentity
+        from mtg_collection.ui.main_window import DeckCompareRow, MainWindow
+
+        class FakeDb:
+            def __init__(self) -> None:
+                self.created_names: list[str] = []
+                self.replaced: list[tuple[int, list[tuple[CardIdentity, int]]]] = []
+
+            def list_collection(self) -> list[dict[str, object]]:
+                return []
+
+            def list_decks(self) -> list[dict[str, object]]:
+                return [{"id": 2, "name": "Burn"}]
+
+            def create_deck(self, name: str) -> int:
+                self.created_names.append(name)
+                return 3
+
+            def replace_deck_cards(self, deck_id: int, cards_with_qty: object) -> None:
+                self.replaced.append((deck_id, list(cards_with_qty)))
+
+            def get_lent_summary_by_oracle_id(self) -> dict[str, tuple[int, list[object]]]:
+                return {}
+
+            def get_lent_cards(self, *, include_returned: bool = False) -> list[dict[str, object]]:
+                return []
+
+        db = FakeDb()
+        window = MainWindow(db, object())
+        card = CardIdentity(
+            oracle_id="oracle-bolt",
+            name="Lightning Bolt",
+            scryfall_uri="https://example.test/lightning-bolt",
+        )
+        window._deck_compare_rows = [DeckCompareRow(card=card, needed=4, owned=4, missing=0)]
+        window._deck_compare_has_unresolved = False
+        window._deck_builder_name.setText("New Burn")
+
+        window._build_deck_from_compare()
+
+        self.assertEqual(db.created_names, ["New Burn"])
+        self.assertEqual(db.replaced, [(3, [(card, 4)])])
+        self.assertEqual(window._deck_builder_name.text(), "")
 
 
 if __name__ == "__main__":

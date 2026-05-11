@@ -43,6 +43,27 @@ class DeckPersistenceTests(unittest.TestCase):
         self.assertEqual(rows[0]["name"], "Lightning Bolt")
         self.assertEqual(rows[0]["quantity"], 3)
 
+    def test_replace_deck_cards_clears_existing_cards_before_inserting(self) -> None:
+        deck_id = self.db.create_deck("Burn")
+        old_card = CardIdentity(
+            oracle_id="oracle-bolt",
+            name="Lightning Bolt",
+            scryfall_uri="https://example.test/lightning-bolt",
+        )
+        new_card = CardIdentity(
+            oracle_id="oracle-rift-bolt",
+            name="Rift Bolt",
+            scryfall_uri="https://example.test/rift-bolt",
+        )
+        self.db.add_card_to_deck(deck_id, old_card, 4)
+
+        self.db.replace_deck_cards(deck_id, [(new_card, 3)])
+
+        rows = self.db.list_deck_cards(deck_id)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["oracle_id"], "oracle-rift-bolt")
+        self.assertEqual(rows[0]["quantity"], 3)
+
     def test_collection_in_deck_is_derived_from_saved_deck_cards(self) -> None:
         card = CardIdentity(
             oracle_id="oracle-counterspell",

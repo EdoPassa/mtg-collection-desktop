@@ -10,7 +10,6 @@ from mtg_collection.importer import ImportLine, parse_csv_bytes, parse_txt
 from mtg_collection.resolver import ApiOnlyResolver, CardResolver, ResolveResult, build_default_bulk_first_resolver, normalize_card_name
 from mtg_collection.scryfall import ScryfallClient, ScryfallError
 from mtg_collection.ui.tabs.collection_tab import build_collection_tab
-from mtg_collection.ui.tabs.deck_builder_tab import build_deck_builder_tab
 from mtg_collection.ui.tabs.deck_tab import build_deck_tab
 from mtg_collection.ui.tabs.import_tab import build_import_tab
 from mtg_collection.ui.tabs.lent_tab import build_lent_tab
@@ -24,6 +23,14 @@ class ResolvedLine:
     oracle_id: str
     canonical_name: str
     scryfall_uri: str
+
+
+@dataclass(frozen=True)
+class DeckCompareRow:
+    card: CardIdentity
+    needed: int
+    owned: int
+    missing: int
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -40,26 +47,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self._import_tab = QtWidgets.QWidget()
         self._collection_tab = QtWidgets.QWidget()
         self._deck_tab = QtWidgets.QWidget()
-        self._deck_builder_tab = QtWidgets.QWidget()
         self._lent_tab = QtWidgets.QWidget()
+        self._deck_last_mismatches: list[tuple[str, CardIdentity]] = []
+        self._deck_compare_rows: list[DeckCompareRow] = []
+        self._deck_compare_has_unresolved = False
 
         self._tabs.addTab(self._import_tab, "Import")
         self._tabs.addTab(self._collection_tab, "Collection")
         self._tabs.addTab(self._deck_tab, "Deck compare")
-        self._tabs.addTab(self._deck_builder_tab, "Deck builder")
         self._tabs.addTab(self._lent_tab, "Lent cards")
 
         self._build_import_tab()
         self._build_collection_tab()
         self._build_deck_tab()
-        self._build_deck_builder_tab()
         self._build_lent_tab()
 
         self._refresh_decks()
         self.refresh_collection()
         self.refresh_lent_cards()
-
-        self._deck_last_mismatches: list[tuple[str, CardIdentity]] = []
 
     def _build_import_tab(self) -> None:
         build_import_tab(self, self._import_tab)
@@ -69,9 +74,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _build_deck_tab(self) -> None:
         build_deck_tab(self, self._deck_tab)
-
-    def _build_deck_builder_tab(self) -> None:
-        build_deck_builder_tab(self, self._deck_builder_tab)
 
     def _build_lent_tab(self) -> None:
         build_lent_tab(self, self._lent_tab)
@@ -273,9 +275,33 @@ class MainWindow(QtWidgets.QMainWindow):
         if selected_index >= 0:
             selector.setCurrentIndex(selected_index)
         selector.blockSignals(False)
-        self._refresh_selected_deck_cards()
+        self._update_deck_build_state()
+
+    def _update_deck_build_mode(self) -> None:
+        create_new = self._deck_build_mode.currentText() == "Create new"
+        self._deck_builder_name.setEnabled(create_new)
+        self._deck_builder_selector.setEnabled(not create_new)
+        self._update_deck_build_state()
+
+    def _update_deck_build_state(self) -> None:
+        rows = getattr(self, "_deck_compare_rows", [])
+        has_missing = any(row.missing > 0 for row in rows)
+        can_build = bool(rows) and not has_missing and not getattr(self, "_deck_compare_has_unresolved", False)
+        if self._deck_build_mode.currentText() == "Replace existing" and self._deck_builder_selector.currentData() is None:
+            can_build = False
+        self._deck_build_btn.setEnabled(can_build)
+        if not rows:
+            self._deck_build_status.setPlainText("Compute a deck comparison before building.")
+        elif self._deck_compare_has_unresolved:
+            self._deck_build_status.setPlainText("Resolve all decklist lines before building.")
+        elif has_missing:
+            self._deck_build_status.setPlainText("Build is available only when all missing quantities are 0.")
+        else:
+            self._deck_build_status.setPlainText("All cards are available. You can build this deck.")
 
     def _refresh_selected_deck_cards(self) -> None:
+        if not hasattr(self, "_deck_builder_cards"):
+            return
         deck_id = self._deck_builder_selector.currentData()
         self._deck_builder_cards.setRowCount(0)
         if deck_id is None:
@@ -323,6 +349,63 @@ class MainWindow(QtWidgets.QMainWindow):
         self._refresh_selected_deck_cards()
         self.refresh_collection()
         self._deck_builder_status.setPlainText(f"Added {quantity}x {identity.name}.")
+
+    def _build_deck_from_compare(self) -> None:
+        rows = self._deck_compare_rows
+        if not rows:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Compute a deck comparison first.")
+            return
+        if self._deck_compare_has_unresolved:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Resolve all decklist lines before building.")
+            return
+
+        missing_rows = [row for row in rows if row.missing > 0]
+        if missing_rows:
+            QtWidgets.QMessageBox.warning(self, "Validation error", "Cannot build while any card has missing quantity.")
+            return
+
+        cards_with_qty = [(row.card, row.needed) for row in rows]
+        mode = self._deck_build_mode.currentText()
+        if mode == "Create new":
+            name = self._deck_builder_name.text().strip()
+            if not name:
+                QtWidgets.QMessageBox.warning(self, "Validation error", "Please enter a deck name.")
+                return
+            try:
+                deck_id = self._db.create_deck(name)
+                self._db.replace_deck_cards(deck_id, cards_with_qty)
+            except ValueError as e:
+                QtWidgets.QMessageBox.warning(self, "Validation error", str(e))
+                return
+
+            self._deck_builder_name.clear()
+            self._refresh_decks(select_deck_id=deck_id)
+            self._deck_build_status.setPlainText(f"Created deck: {name}")
+        else:
+            deck_id = self._deck_builder_selector.currentData()
+            if deck_id is None:
+                QtWidgets.QMessageBox.warning(self, "Validation error", "Select a deck to replace.")
+                return
+
+            deck_name = self._deck_builder_selector.currentText()
+            answer = QtWidgets.QMessageBox.question(
+                self,
+                "Replace deck",
+                f"Replace all cards in {deck_name!r} with this list?",
+            )
+            if answer != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+
+            try:
+                self._db.replace_deck_cards(int(deck_id), cards_with_qty)
+            except ValueError as e:
+                QtWidgets.QMessageBox.warning(self, "Validation error", str(e))
+                return
+
+            self._refresh_decks(select_deck_id=int(deck_id))
+            self._deck_build_status.setPlainText(f"Replaced deck: {deck_name}")
+
+        self.refresh_collection()
 
     def _quick_lent_dialog(self, oracle_id: str, card_name: str) -> None:
         """Open a simple dialog to quickly mark a card as lent from the collection view."""
@@ -392,8 +475,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._deck_out.setRowCount(0)
         self._deck_unresolved.clear()
         self._deck_last_mismatches = []
+        self._deck_compare_rows = []
+        self._deck_compare_has_unresolved = False
         self._deck_repair_btn.setEnabled(False)
         self._deck_export_btn.setEnabled(False)
+        self._update_deck_build_state()
 
         lines, unresolved = parse_txt(self._deck_input.toPlainText())
         unresolved_msgs: list[str] = []
@@ -453,14 +539,18 @@ class MainWindow(QtWidgets.QMainWindow):
                             f"- Ambiguous name match for {name!r}: found {len(candidates)} owned entries with that name; using sum={have} but cannot auto-repair."
                         )
             missing = max(0, need - have)
+            card = resolved_cards_by_oracle[oracle_id]
+            self._deck_compare_rows.append(DeckCompareRow(card=card, needed=need, owned=have, missing=missing))
             self._deck_out.setItem(r, 0, QtWidgets.QTableWidgetItem(name))
             self._deck_out.setItem(r, 1, QtWidgets.QTableWidgetItem(str(need)))
             self._deck_out.setItem(r, 2, QtWidgets.QTableWidgetItem(str(have)))
             self._deck_out.setItem(r, 3, QtWidgets.QTableWidgetItem(str(missing)))
 
+        self._deck_compare_has_unresolved = bool(unresolved_msgs)
         self._deck_unresolved.setPlainText("\n".join(unresolved_msgs).strip())
         self._deck_repair_btn.setEnabled(len(self._deck_last_mismatches) > 0)
         self._deck_export_btn.setEnabled(self._deck_out.rowCount() > 0)
+        self._update_deck_build_state()
         self._apply_deck_filter()
 
     def _repair_deck_mismatches(self) -> None:

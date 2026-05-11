@@ -207,6 +207,42 @@ class CollectionDb:
         except sqlite3.IntegrityError as e:
             raise ValueError("deck does not exist") from e
 
+    def replace_deck_cards(self, deck_id: int, cards_with_qty: Iterable[tuple[CardIdentity, int]]) -> None:
+        rows = list(cards_with_qty)
+        for _, qty in rows:
+            if qty <= 0:
+                raise ValueError("quantity must be > 0")
+
+        try:
+            with self._conn:
+                deck = self._conn.execute("SELECT 1 FROM decks WHERE id = ?", (deck_id,)).fetchone()
+                if deck is None:
+                    raise ValueError("deck does not exist")
+
+                self._conn.execute("DELETE FROM deck_cards WHERE deck_id = ?", (deck_id,))
+                for card, qty in rows:
+                    self._conn.execute(
+                        """
+                        INSERT INTO cards (oracle_id, name, scryfall_uri)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(oracle_id) DO UPDATE SET
+                          name = excluded.name,
+                          scryfall_uri = excluded.scryfall_uri
+                        """,
+                        (card.oracle_id, card.name, card.scryfall_uri),
+                    )
+                    self._conn.execute(
+                        """
+                        INSERT INTO deck_cards (deck_id, oracle_id, quantity)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(deck_id, oracle_id) DO UPDATE SET
+                          quantity = excluded.quantity
+                        """,
+                        (deck_id, card.oracle_id, qty),
+                    )
+        except sqlite3.IntegrityError as e:
+            raise ValueError("deck does not exist") from e
+
     def list_deck_cards(self, deck_id: int) -> list[sqlite3.Row]:
         cur = self._conn.execute(
             """
