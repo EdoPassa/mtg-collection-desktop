@@ -135,6 +135,7 @@ func fetchBulkInfo(ctx context.Context, client *http.Client, metadataURL string)
 	if err != nil {
 		return bulkInfo{}, err
 	}
+	applyAPIHeaders(req, DefaultUserAgent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return bulkInfo{}, err
@@ -169,6 +170,7 @@ func downloadBulk(ctx context.Context, client *http.Client, uri string, paths *B
 	if err != nil {
 		return err
 	}
+	applyAPIHeaders(req, DefaultUserAgent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

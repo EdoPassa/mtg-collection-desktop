@@ -54,6 +54,45 @@ describe("App", () => {
     expect(screen.getByText("Available: 3")).toBeInTheDocument();
   });
 
+  it("renders import preview when the backend returns null slices", async () => {
+    const api = fakeApi();
+    vi.mocked(api.PreviewTextImport).mockResolvedValue({ validated: null, unresolved: null } as never);
+
+    render(<App api={api} />);
+    await userEvent.click(screen.getByRole("button", { name: "Validate" }));
+
+    expect(await screen.findByText("Validated 0 row(s).")).toBeInTheDocument();
+    expect(screen.getAllByText("None.")).toHaveLength(2);
+  });
+
+  it("validates CSV imports through the backend", async () => {
+    const api = fakeApi();
+    vi.mocked(api.PreviewCSVImport).mockResolvedValue({
+      validated: [
+        {
+          line: { raw: "csv", quantity: 2, name: "Counterspell" },
+          oracleId: "oracle-counterspell",
+          name: "Counterspell",
+          scryfallUri: "https://example.test/counterspell",
+          source: "bulk"
+        }
+      ],
+      unresolved: []
+    });
+
+    render(<App api={api} />);
+    await userEvent.selectOptions(screen.getByLabelText("Import source mode"), "csv");
+
+    const file = new File(["name,quantity\nCounterspell,2\n"], "cards.csv", { type: "text/csv" });
+    const hiddenInput = document.getElementById("import-csv-file") as HTMLInputElement;
+    await userEvent.upload(hiddenInput, file);
+    await userEvent.click(screen.getByRole("button", { name: "Validate" }));
+
+    expect(api.PreviewCSVImport).toHaveBeenCalled();
+    expect(await screen.findByText("Validated 1 row(s).")).toBeInTheDocument();
+    expect(screen.getByText("2x Counterspell (bulk)")).toBeInTheDocument();
+  });
+
   it("renders an empty collection instead of crashing when the backend returns null", async () => {
     const api = fakeApi();
     vi.mocked(api.ListCollection).mockResolvedValue(null as never);

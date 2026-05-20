@@ -16,6 +16,7 @@ import (
 type Options struct {
 	BaseURL     string
 	HTTPClient  *http.Client
+	UserAgent   string
 	Timeout     time.Duration
 	MinInterval time.Duration
 	MaxAttempts int
@@ -24,6 +25,7 @@ type Options struct {
 type Client struct {
 	baseURL     string
 	httpClient  *http.Client
+	userAgent   string
 	minInterval time.Duration
 	maxAttempts int
 	mu          sync.Mutex
@@ -51,7 +53,11 @@ func NewClient(opts Options) *Client {
 	if maxAttempts == 0 {
 		maxAttempts = 5
 	}
-	return &Client{baseURL: baseURL, httpClient: httpClient, minInterval: minInterval, maxAttempts: maxAttempts}
+	userAgent := strings.TrimSpace(opts.UserAgent)
+	if userAgent == "" {
+		userAgent = DefaultUserAgent
+	}
+	return &Client{baseURL: baseURL, httpClient: httpClient, userAgent: userAgent, minInterval: minInterval, maxAttempts: maxAttempts}
 }
 
 func (c *Client) LookupNamed(ctx context.Context, name string) (Card, error) {
@@ -113,6 +119,7 @@ func (c *Client) requestJSON(ctx context.Context, path string, values url.Values
 		if err != nil {
 			return nil, false, err
 		}
+		applyAPIHeaders(req, c.userAgent)
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = err

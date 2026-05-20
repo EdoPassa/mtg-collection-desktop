@@ -2,7 +2,9 @@ package collection
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"mtgcollection/internal/cards"
@@ -33,6 +35,39 @@ func (f fakeResolver) ResolveName(_ context.Context, name string) (resolver.Resu
 func (f fakeResolver) ResolveScryfallID(_ context.Context, id string) (resolver.Result, error) {
 	card := f.cards[id]
 	return resolver.Result{Card: card, Source: "bulk"}, nil
+}
+
+func TestImportPreviewJSONNeverUsesNullSlices(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "not a valid line\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Validated == nil || preview.Unresolved == nil {
+		t.Fatalf("preview slices must be non-nil: %#v", preview)
+	}
+	data, err := json.Marshal(preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `"validated":null`) || strings.Contains(string(data), `"unresolved":null`) {
+		t.Fatalf("import preview JSON must use empty arrays, got %s", data)
+	}
+}
+
+func TestPreviewCSVImportReturnsNonNilSlices(t *testing.T) {
+	service := newTestService(t)
+	csv := []byte("name,quantity\nLightning Bolt,4\n")
+	preview, err := service.PreviewCSVImport(t.Context(), csv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Validated == nil || preview.Unresolved == nil {
+		t.Fatalf("csv preview slices must be non-nil: %#v", preview)
+	}
+	if len(preview.Validated) != 1 {
+		t.Fatalf("validated = %#v, want one row", preview.Validated)
+	}
 }
 
 func TestPreviewAndCommitImportIncrementCollection(t *testing.T) {

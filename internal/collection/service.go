@@ -87,6 +87,9 @@ func (s *Service) PreviewCSVImport(ctx context.Context, data []byte) (ImportPrev
 }
 
 func (s *Service) CommitImport(ctx context.Context, rows []ResolvedLine) error {
+	if rows == nil {
+		rows = []ResolvedLine{}
+	}
 	cardsToUpsert := make([]cards.CardIdentity, 0, len(rows))
 	changes := make([]storage.QuantityChange, 0, len(rows))
 	for _, row := range rows {
@@ -184,7 +187,12 @@ func (s *Service) CompareDeck(ctx context.Context, deckText string) (DeckCompare
 	sort.Slice(rows, func(i, j int) bool {
 		return cards.NormalizeName(rows[i].Card.Name) < cards.NormalizeName(rows[j].Card.Name)
 	})
-	return DeckCompareResult{Rows: rows, Unresolved: unresolved, Repairs: repairs, HasUnresolved: len(unresolved) > 0}, nil
+	return DeckCompareResult{
+		Rows:          nonNilSlice(rows),
+		Unresolved:    nonNilSlice(unresolved),
+		Repairs:       nonNilSlice(repairs),
+		HasUnresolved: len(unresolved) > 0,
+	}, nil
 }
 
 func (s *Service) RepairCompareMismatches(ctx context.Context, repairs []RepairCandidate) error {
@@ -286,7 +294,14 @@ func (s *Service) preview(ctx context.Context, lines []importer.ImportLine, unre
 			Source:      result.Source,
 		})
 	}
-	return ImportPreview{Validated: validated, Unresolved: unresolved}, nil
+	return ImportPreview{Validated: nonNilSlice(validated), Unresolved: nonNilSlice(unresolved)}, nil
+}
+
+func nonNilSlice[T any](items []T) []T {
+	if items == nil {
+		return []T{}
+	}
+	return items
 }
 
 func itoa(v int) string {

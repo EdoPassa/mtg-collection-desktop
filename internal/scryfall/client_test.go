@@ -8,6 +8,22 @@ import (
 	"time"
 )
 
+func TestClientSendsRequiredScryfallHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("User-Agent") == "" || r.Header.Get("Accept") == "" {
+			http.Error(w, `{"object":"error","details":"missing headers"}`, http.StatusBadRequest)
+			return
+		}
+		writeCard(t, w, "oracle-bolt", "Lightning Bolt")
+	}))
+	defer server.Close()
+
+	client := NewClient(Options{BaseURL: server.URL, UserAgent: "MTGCollectionDesktop/1.0", MinInterval: 0, MaxAttempts: 1})
+	if _, err := client.LookupNamed(t.Context(), "Lightning Bolt"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestLookupNamedTriesExactBeforeFuzzy(t *testing.T) {
 	var seen []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
