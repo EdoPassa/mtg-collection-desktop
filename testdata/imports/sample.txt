@@ -1,0 +1,5 @@
+# ignored comment
+4 Lightning Bolt
+Lightning Bolt 1
+2x Counterspell
+Bad line with no quantity

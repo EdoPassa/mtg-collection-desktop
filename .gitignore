@@ -35,6 +35,8 @@ Thumbs.db
 build/
 dist/
 target/
+.worktrees/
+node_modules/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/

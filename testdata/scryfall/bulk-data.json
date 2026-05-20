@@ -1,0 +1,12 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "type": "oracle_cards",
+      "download_uri": "https://example.test/oracle_cards.json",
+      "updated_at": "2026-05-20T00:00:00.000+00:00",
+      "content_type": "application/json",
+      "content_encoding": null
+    }
+  ]
+}

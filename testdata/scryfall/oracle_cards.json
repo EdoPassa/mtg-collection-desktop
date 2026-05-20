@@ -1,0 +1,14 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "oracle_id": "oracle-lightning-bolt",
+    "name": "Lightning Bolt",
+    "scryfall_uri": "https://scryfall.com/card/test/1/lightning-bolt"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "oracle_id": "oracle-counterspell",
+    "name": "Counterspell",
+    "scryfall_uri": "https://scryfall.com/card/test/2/counterspell"
+  }
+]
