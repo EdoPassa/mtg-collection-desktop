@@ -11,7 +11,13 @@
 
 1. Install Go and Node.js.
 2. Install Wails CLI with `go install github.com/wailsapp/wails/v2/cmd/wails@latest`.
-3. From the repository root, run `wails build`.
+3. From the repository root, run `wails build` (or `.\scripts\build_windows.ps1`).
+
+## Linux Packaging
+
+1. Install Go, Node.js, `gtk3`, and `webkit2gtk-4.1` (Arch: `pacman -S gtk3 webkit2gtk-4.1`).
+2. Install Wails CLI with `go install github.com/wailsapp/wails/v2/cmd/wails@latest`.
+3. From the repository root, run `wails build`. The project sets `build:tags` to `webkit2_41` in `wails.json` for WebKit 4.1-based distributions.
 4. Verify the generated executable starts without Python installed.
 5. Verify the executable can open a migrated copy of an existing database.
 

@@ -19,6 +19,7 @@ The active desktop app is a Go/Wails application with a React frontend. It persi
 - Node.js and npm
 - Wails CLI for packaged builds:
   `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+- Linux (Arch, Fedora 41+, Ubuntu 24.04+): `gtk3` and `webkit2gtk-4.1` (e.g. `pacman -S gtk3 webkit2gtk-4.1` on Arch). `wails.json` sets `build:tags` to `webkit2_41` for these systems.
 - Python `3.11+`
 - Internet access on first run (to bootstrap Scryfall bulk data cache)
 
@@ -35,6 +36,12 @@ Build a Windows executable:
 
 ```powershell
 .\scripts\build_windows.ps1
+```
+
+Build a Linux binary:
+
+```bash
+wails build
 ```
 
 ### Legacy Python App
