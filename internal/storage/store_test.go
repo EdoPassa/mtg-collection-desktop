@@ -44,7 +44,7 @@ func TestListCollectionReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 	}
 }
 
-func TestDeckAndLendingSemanticsMatchPythonApp(t *testing.T) {
+func TestDeckAndLendingSemantics(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
 

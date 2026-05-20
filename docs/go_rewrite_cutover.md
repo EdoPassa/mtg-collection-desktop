@@ -18,7 +18,7 @@
 1. Install Go, Node.js, `gtk3`, and `webkit2gtk-4.1` (Arch: `pacman -S gtk3 webkit2gtk-4.1`).
 2. Install Wails CLI with `go install github.com/wailsapp/wails/v2/cmd/wails@latest`.
 3. From the repository root, run `wails build`. The project sets `build:tags` to `webkit2_41` in `wails.json` for WebKit 4.1-based distributions.
-4. Verify the generated executable starts without Python installed.
+4. Verify the generated executable starts on a machine with only Go/Node build tooling installed.
 5. Verify the executable can open a migrated copy of an existing database.
 
 ## Generated Artifacts
@@ -30,7 +30,7 @@
 ## Manual QA Checklist
 
 - Start with no database and confirm the app creates a usable empty collection.
-- Start with an existing Python-created `data/collection.sqlite3` and confirm collection, decks, and lending rows load.
+- Start with an existing `data/collection.sqlite3` and confirm collection, decks, and lending rows load.
 - Import TXT rows with prefix, suffix, and `2x` quantities.
 - Import CSV rows with `Card Name`, `Quantity`, and optional `Scryfall ID`.
 - Confirm bulk-first resolution works after cache bootstrap.

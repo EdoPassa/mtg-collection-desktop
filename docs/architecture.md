@@ -54,13 +54,6 @@ This document explains how the MTG Collection Desktop app is organized and how d
   - React application shell and workflow panels;
   - uses generated `frontend/wailsjs` models/bindings instead of hand-written API shapes.
 
-Legacy Python modules in `src/mtg_collection` mirror many of these responsibilities and remain useful as behavioral reference until the rewrite is retired.
-
-- `src/mtg_collection/scryfall_bulk.py`
-  - fetches bulk metadata from `/bulk-data`;
-  - downloads and caches oracle cards payload to `data/scryfall/`;
-  - streams JSON/JSON.GZ efficiently (uses `ijson` when available).
-
 ## Data model
 
 Tables created by `internal/storage`:
@@ -98,7 +91,6 @@ Design notes:
 
 - `internal/.../*_test.go`: Go storage, resolver, collection, app-data, and Wails facade behavior.
 - `frontend/src/*.test.tsx`: React workflow coverage with mocked Wails APIs.
-- `tests/`: legacy Python coverage retained for the reference implementation.
 
 Run all tests:
 

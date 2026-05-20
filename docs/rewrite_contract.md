@@ -1,6 +1,6 @@
 # Go Rewrite Compatibility Contract
 
-This contract records the Python app behavior that the Go rewrite must preserve before the Python implementation can be retired.
+This contract records the desktop app behavior that the Go implementation must preserve.
 
 ## Data Model
 
