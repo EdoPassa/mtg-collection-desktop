@@ -4,15 +4,21 @@ import {collection} from '../models';
 import {storage} from '../models';
 import {cards} from '../models';
 
+export function AddCardToDeckByName(arg1:number,arg2:string,arg3:number):Promise<void>;
+
 export function BuildDeckFromCompare(arg1:collection.BuildDeckInput):Promise<number>;
 
 export function CommitImport(arg1:Array<collection.ResolvedLine>):Promise<void>;
 
 export function CompareDeck(arg1:string):Promise<collection.DeckCompareResult>;
 
+export function DeleteDeck(arg1:number):Promise<void>;
+
 export function LendCard(arg1:storage.LendInput):Promise<void>;
 
 export function ListCollection():Promise<Array<cards.CollectionItem>>;
+
+export function ListDeckCards(arg1:number):Promise<Array<cards.DeckCard>>;
 
 export function ListDecks():Promise<Array<cards.Deck>>;
 
@@ -22,8 +28,12 @@ export function PreviewCSVImport(arg1:Array<number>):Promise<collection.ImportPr
 
 export function PreviewTextImport(arg1:string):Promise<collection.ImportPreview>;
 
+export function RenameDeck(arg1:number,arg2:string):Promise<void>;
+
 export function RepairCompareMismatches(arg1:Array<collection.RepairCandidate>):Promise<void>;
 
 export function ResolverStatus():Promise<string>;
 
 export function ReturnCard(arg1:number,arg2:string):Promise<void>;
+
+export function SetDeckCardQuantity(arg1:number,arg2:string,arg3:number):Promise<void>;

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { BackendApi, CollectionItem, DeckCompareResult, ImportPreview, LentCard } from "./backend";
+import type { BackendApi, CollectionItem, Deck, DeckCard, DeckCompareResult, ImportPreview, LentCard } from "./backend";
 
 const sections = [
   { id: "Import", icon: "↓", description: "Validate and add cards" },
   { id: "Collection", icon: "◆", description: "Browse owned cards" },
+  { id: "Decks", icon: "▤", description: "Browse and edit saved decks" },
   { id: "Decks / Compare", icon: "⚔", description: "Compare decklists" },
   { id: "Lending", icon: "↔", description: "Track lent cards" }
 ] as const;
@@ -13,6 +14,7 @@ type Section = (typeof sections)[number]["id"];
 const sectionTitles: Record<Section, string> = {
   Import: "Import Cards",
   Collection: "Collection",
+  Decks: "Decks",
   "Decks / Compare": "Decks / Compare",
   Lending: "Lending"
 };
@@ -76,6 +78,7 @@ export function App({ api }: { api: BackendApi }) {
 
         {active === "Import" && <ImportPanel api={api} setMessage={setMessage} />}
         {active === "Collection" && <CollectionPanel api={api} setMessage={setMessage} />}
+        {active === "Decks" && <DecksPanel api={api} setMessage={setMessage} />}
         {active === "Decks / Compare" && <DeckPanel api={api} setMessage={setMessage} />}
         {active === "Lending" && <LendingPanel api={api} setMessage={setMessage} />}
       </div>
@@ -277,6 +280,260 @@ function CollectionPanel({ api, setMessage }: { api: BackendApi; setMessage: (me
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function DecksPanel({ api, setMessage }: { api: BackendApi; setMessage: (message: string) => void }) {
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [deckQuery, setDeckQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [cards, setCards] = useState<DeckCard[]>([]);
+  const [cardQuery, setCardQuery] = useState("");
+  const [renameValue, setRenameValue] = useState("");
+  const [addName, setAddName] = useState("");
+  const [addQty, setAddQty] = useState(1);
+
+  const selectedDeck = decks.find((deck) => deck.id === selectedId) ?? null;
+
+  async function loadDecks() {
+    try {
+      const next = (await api.ListDecks()) ?? [];
+      setDecks(next);
+      if (selectedId !== null && !next.some((deck) => deck.id === selectedId)) {
+        setSelectedId(null);
+        setCards([]);
+        setRenameValue("");
+      }
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function loadCards(deckID: number) {
+    try {
+      setCards((await api.ListDeckCards(deckID)) ?? []);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  useEffect(() => {
+    void loadDecks();
+  }, []);
+
+  useEffect(() => {
+    if (selectedId === null) {
+      setCards([]);
+      return;
+    }
+    void loadCards(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (selectedDeck) {
+      setRenameValue(selectedDeck.name);
+    }
+  }, [selectedDeck?.id, selectedDeck?.name]);
+
+  const filteredDecks = useMemo(
+    () => decks.filter((deck) => deck.name.toLocaleLowerCase().includes(deckQuery.toLocaleLowerCase())),
+    [decks, deckQuery]
+  );
+
+  const filteredCards = useMemo(
+    () => cards.filter((row) => row.card.name.toLocaleLowerCase().includes(cardQuery.toLocaleLowerCase())),
+    [cards, cardQuery]
+  );
+
+  const totalCards = useMemo(() => cards.reduce((sum, row) => sum + row.quantity, 0), [cards]);
+
+  async function selectDeck(deck: Deck) {
+    setSelectedId(deck.id);
+    setCardQuery("");
+  }
+
+  async function saveRename() {
+    if (selectedId === null || renameValue.trim() === "") {
+      return;
+    }
+    try {
+      await api.RenameDeck(selectedId, renameValue);
+      setMessage(`Renamed deck to ${renameValue.trim()}.`);
+      await loadDecks();
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function deleteDeck() {
+    if (selectedId === null || selectedDeck === null) {
+      return;
+    }
+    if (!window.confirm(`Delete deck "${selectedDeck.name}"?`)) {
+      return;
+    }
+    try {
+      await api.DeleteDeck(selectedId);
+      setMessage(`Deleted deck ${selectedDeck.name}.`);
+      setSelectedId(null);
+      setCards([]);
+      await loadDecks();
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function setQuantity(oracleID: string, qty: number) {
+    if (selectedId === null) {
+      return;
+    }
+    try {
+      await api.SetDeckCardQuantity(selectedId, oracleID, qty);
+      await loadCards(selectedId);
+      setMessage(qty <= 0 ? "Removed card from deck." : "Updated card quantity.");
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function addCard() {
+    if (selectedId === null || addName.trim() === "" || addQty <= 0) {
+      return;
+    }
+    try {
+      await api.AddCardToDeckByName(selectedId, addName.trim(), addQty);
+      setMessage(`Added ${addQty}x ${addName.trim()} to deck.`);
+      setAddName("");
+      setAddQty(1);
+      await loadCards(selectedId);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  return (
+    <section className="panel" aria-label="Decks">
+      <div className="deck-browser">
+        <div className="deck-browser-list">
+          <div className="toolbar">
+            <input
+              aria-label="Search decks"
+              placeholder="Search decks…"
+              value={deckQuery}
+              onChange={(event) => setDeckQuery(event.target.value)}
+            />
+            <button type="button" className="ghost" onClick={() => void loadDecks()}>
+              Refresh
+            </button>
+          </div>
+          {filteredDecks.length === 0 ? (
+            <EmptyState
+              title="No decks found."
+              detail={decks.length === 0 ? "Build a deck from Decks / Compare to see it here." : "Try a different search term."}
+            />
+          ) : (
+            <ul className="deck-list">
+              {filteredDecks.map((deck) => (
+                <li key={deck.id}>
+                  <button
+                    type="button"
+                    className={`deck-list-item${selectedId === deck.id ? " deck-list-item--active" : ""}`}
+                    aria-current={selectedId === deck.id ? "true" : undefined}
+                    onClick={() => void selectDeck(deck)}
+                  >
+                    <span className="deck-list-name">{deck.name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="deck-browser-detail">
+          {selectedDeck === null ? (
+            <EmptyState title="Select a deck" detail="Choose a deck from the list to view and edit its cards." />
+          ) : (
+            <>
+              <div className="toolbar deck-detail-toolbar">
+                <input aria-label="Deck name" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} />
+                <button type="button" onClick={() => void saveRename()} disabled={renameValue.trim() === "" || renameValue.trim() === selectedDeck.name}>
+                  Save name
+                </button>
+                <button type="button" className="ghost" onClick={() => void deleteDeck()}>
+                  Delete deck
+                </button>
+                <span className="card-meta">{totalCards} card(s)</span>
+              </div>
+              <div className="toolbar">
+                <input
+                  aria-label="Search deck cards"
+                  placeholder="Search cards…"
+                  value={cardQuery}
+                  onChange={(event) => setCardQuery(event.target.value)}
+                />
+                <input
+                  aria-label="Card name to add"
+                  placeholder="Add card name…"
+                  value={addName}
+                  onChange={(event) => setAddName(event.target.value)}
+                />
+                <input
+                  aria-label="Quantity to add"
+                  type="number"
+                  min={1}
+                  value={addQty}
+                  onChange={(event) => setAddQty(Math.max(1, Number(event.target.value) || 1))}
+                />
+                <button type="button" className="primary" onClick={() => void addCard()} disabled={!addName.trim()}>
+                  Add card
+                </button>
+              </div>
+              {filteredCards.length === 0 ? (
+                <EmptyState
+                  title="No cards in this deck."
+                  detail={cards.length === 0 ? "Add cards by name or build this deck from Decks / Compare." : "Try a different search term."}
+                />
+              ) : (
+                <div className="card-grid">
+                  {filteredCards.map((row) => (
+                    <article key={row.card.oracleId} className="card-row">
+                      <h3>{row.card.name}</h3>
+                      <div className="stat-row">
+                        <Stat label="Qty" value={row.quantity} />
+                      </div>
+                      <div className="deck-card-actions">
+                        <button type="button" className="ghost" onClick={() => void setQuantity(row.card.oracleId, row.quantity - 1)}>
+                          −
+                        </button>
+                        <input
+                          aria-label={`Quantity for ${row.card.name}`}
+                          type="number"
+                          min={0}
+                          defaultValue={row.quantity}
+                          key={`${row.card.oracleId}-${row.quantity}`}
+                          onBlur={(event) => {
+                            const qty = Number(event.target.value);
+                            if (!Number.isNaN(qty) && qty !== row.quantity) {
+                              void setQuantity(row.card.oracleId, qty);
+                            }
+                          }}
+                        />
+                        <button type="button" className="ghost" onClick={() => void setQuantity(row.card.oracleId, row.quantity + 1)}>
+                          +
+                        </button>
+                        <button type="button" className="ghost" onClick={() => void setQuantity(row.card.oracleId, 0)}>
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

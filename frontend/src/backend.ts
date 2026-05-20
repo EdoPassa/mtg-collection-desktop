@@ -17,6 +17,7 @@ export type BuildDeckInput = Plain<collection.BuildDeckInput>;
 export type LendInput = Plain<storage.LendInput>;
 export type LentCard = Plain<cards.LentCard>;
 export type Deck = Plain<cards.Deck>;
+export type DeckCard = Plain<cards.DeckCard>;
 
 export type WailsBindings = typeof wailsApi;
 
@@ -29,6 +30,11 @@ export type BackendApi = {
   CompareDeck(text: string): Promise<DeckCompareResult>;
   BuildDeckFromCompare(input: BuildDeckInput): Promise<number>;
   ListDecks(): Promise<Deck[]>;
+  ListDeckCards(deckID: number): Promise<DeckCard[]>;
+  DeleteDeck(deckID: number): Promise<void>;
+  RenameDeck(deckID: number, name: string): Promise<void>;
+  SetDeckCardQuantity(deckID: number, oracleID: string, qty: number): Promise<void>;
+  AddCardToDeckByName(deckID: number, name: string, qty: number): Promise<void>;
   LendCard(input: LendInput): Promise<void>;
   ListLentCards(includeReturned: boolean): Promise<LentCard[]>;
   ReturnCard(id: number, returnDate: string): Promise<void>;
@@ -45,6 +51,11 @@ export function createBackendApi(bindings: WailsBindings = wailsApi): BackendApi
     CompareDeck: (text) => bindings.CompareDeck(text) as Promise<DeckCompareResult>,
     BuildDeckFromCompare: (input) => bindings.BuildDeckFromCompare(input as collection.BuildDeckInput),
     ListDecks: () => bindings.ListDecks() as Promise<Deck[]>,
+    ListDeckCards: (deckID) => bindings.ListDeckCards(deckID) as Promise<DeckCard[]>,
+    DeleteDeck: bindings.DeleteDeck,
+    RenameDeck: bindings.RenameDeck,
+    SetDeckCardQuantity: bindings.SetDeckCardQuantity,
+    AddCardToDeckByName: bindings.AddCardToDeckByName,
     LendCard: (input) => bindings.LendCard(input as storage.LendInput),
     ListLentCards: (includeReturned) => bindings.ListLentCards(includeReturned) as Promise<LentCard[]>,
     ReturnCard: bindings.ReturnCard,

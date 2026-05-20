@@ -54,6 +54,26 @@ func (a *App) ListDecks() ([]cards.Deck, error) {
 	return a.service.ListDecks(context.Background())
 }
 
+func (a *App) ListDeckCards(deckID int64) ([]cards.DeckCard, error) {
+	return a.service.ListDeckCards(context.Background(), deckID)
+}
+
+func (a *App) DeleteDeck(deckID int64) error {
+	return a.service.DeleteDeck(context.Background(), deckID)
+}
+
+func (a *App) RenameDeck(deckID int64, name string) error {
+	return a.service.RenameDeck(context.Background(), deckID, name)
+}
+
+func (a *App) SetDeckCardQuantity(deckID int64, oracleID string, qty int) error {
+	return a.service.SetDeckCardQuantity(context.Background(), deckID, oracleID, qty)
+}
+
+func (a *App) AddCardToDeckByName(deckID int64, name string, qty int) error {
+	return a.service.AddCardToDeckByName(context.Background(), deckID, name, qty)
+}
+
 func (a *App) LendCard(input storage.LendInput) error {
 	return a.service.LendCard(context.Background(), input)
 }
