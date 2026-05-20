@@ -37,6 +37,7 @@ dist/
 target/
 .worktrees/
 node_modules/
+frontend/package.json.md5
 *.egg-info/
 .pytest_cache/
 .mypy_cache/

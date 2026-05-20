@@ -13,11 +13,17 @@ body {
   padding: 2rem;
 }
 
-header {
+.app-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
   margin-bottom: 1.5rem;
 }
 
-nav {
+.tabs,
+.actions,
+.toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -30,6 +36,42 @@ button {
   padding: 0.75rem 1rem;
   background: #1f2937;
   color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+button[aria-current="page"] {
+  background: #2563eb;
+  border-color: #60a5fa;
+}
+
+input,
+textarea {
+  border: 1px solid #374151;
+  border-radius: 0.75rem;
+  box-sizing: border-box;
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  width: 100%;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.status-pill,
+.message {
+  border: 1px solid #374151;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  background: #1f2937;
 }
 
 .panel {
@@ -37,4 +79,23 @@ button {
   border-radius: 1rem;
   padding: 1.5rem;
   background: #172033;
+}
+
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.card-row,
+.result-list {
+  border: 1px solid #374151;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: #111827;
+}
+
+.card-row h3,
+.result-list h3 {
+  margin-top: 0;
 }

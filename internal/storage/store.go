@@ -188,7 +188,7 @@ func (s *Store) ListCollection(ctx context.Context) ([]cards.CollectionItem, err
 		return nil, err
 	}
 	defer rows.Close()
-	var out []cards.CollectionItem
+	out := []cards.CollectionItem{}
 	for rows.Next() {
 		var row cards.CollectionItem
 		var inDeck int
@@ -355,7 +355,12 @@ func (s *Store) GetOwnedByNormalizedName(ctx context.Context) (map[string][]Name
 }
 
 func (s *Store) MoveCollectionQuantity(ctx context.Context, fromOracleID string, toCard cards.CardIdentity) error {
-	if strings.TrimSpace(fromOracleID) == "" {
+	fromOracleID = strings.TrimSpace(fromOracleID)
+	toCard.OracleID = strings.TrimSpace(toCard.OracleID)
+	if fromOracleID == "" {
+		return nil
+	}
+	if fromOracleID == toCard.OracleID {
 		return nil
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -406,8 +411,22 @@ func (s *Store) LendCard(ctx context.Context, input LendInput) error {
 }
 
 func (s *Store) ReturnCard(ctx context.Context, lentID int64, returnDate string) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE lent_cards SET return_date = ? WHERE id = ?", returnDate, lentID)
-	return err
+	returnDate = strings.TrimSpace(returnDate)
+	if returnDate == "" {
+		return errors.New("return date cannot be empty")
+	}
+	res, err := s.db.ExecContext(ctx, "UPDATE lent_cards SET return_date = ? WHERE id = ?", returnDate, lentID)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return errors.New("lent card does not exist")
+	}
+	return nil
 }
 
 func (s *Store) ListLentCards(ctx context.Context, includeReturned bool) ([]cards.LentCard, error) {
@@ -426,7 +445,7 @@ func (s *Store) ListLentCards(ctx context.Context, includeReturned bool) ([]card
 		return nil, err
 	}
 	defer rows.Close()
-	var out []cards.LentCard
+	out := []cards.LentCard{}
 	for rows.Next() {
 		var row cards.LentCard
 		if err := rows.Scan(&row.ID, &row.Card.OracleID, &row.Card.Name, &row.Card.ScryfallURI, &row.Quantity, &row.BorrowerName, &row.LentDate, &row.ReturnDate, &row.Notes); err != nil {

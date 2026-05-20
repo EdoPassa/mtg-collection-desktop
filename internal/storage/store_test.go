@@ -28,6 +28,22 @@ func TestOpenCreatesCompatibleSchemaAndCollectionWorkflow(t *testing.T) {
 	}
 }
 
+func TestListCollectionReturnsEmptySliceForEmptyDatabase(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	rows, err := store.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows == nil {
+		t.Fatal("ListCollection returned nil, want empty slice for Wails JSON arrays")
+	}
+	if len(rows) != 0 {
+		t.Fatalf("collection rows = %#v, want empty collection", rows)
+	}
+}
+
 func TestDeckAndLendingSemanticsMatchPythonApp(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
@@ -108,6 +124,84 @@ func TestMoveCollectionQuantityMergesAndDeletesSource(t *testing.T) {
 	}
 	if got := owned[newCard.OracleID].Quantity; got != 3 {
 		t.Fatalf("merged quantity = %d, want 3", got)
+	}
+}
+
+func TestMoveCollectionQuantitySameOracleIDPreservesQuantity(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	card := cards.CardIdentity{OracleID: "oracle-shock", Name: "Shock", ScryfallURI: "https://example.test/shock"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{card}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), card.OracleID, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.MoveCollectionQuantity(t.Context(), card.OracleID, card); err != nil {
+		t.Fatal(err)
+	}
+
+	owned, err := store.GetOwnedByOracleID(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := owned[card.OracleID].Quantity; got != 2 {
+		t.Fatalf("quantity after same-oracle move = %d, want 2", got)
+	}
+}
+
+func TestReturnCardRejectsInvalidRowsAndDates(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	card := cards.CardIdentity{OracleID: "oracle-opt", Name: "Opt", ScryfallURI: "https://example.test/opt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{card}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LendCard(t.Context(), LendInput{OracleID: card.OracleID, Quantity: 1, BorrowerName: "Alice", LentDate: "2026-05-20"}); err != nil {
+		t.Fatal(err)
+	}
+	lent, err := store.ListLentCards(t.Context(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lent) != 1 {
+		t.Fatalf("lent rows = %#v, want one active row", lent)
+	}
+
+	if err := store.ReturnCard(t.Context(), lent[0].ID, ""); err == nil {
+		t.Fatal("ReturnCard accepted an empty return date")
+	}
+	if err := store.ReturnCard(t.Context(), 9999, "2026-05-21"); err == nil {
+		t.Fatal("ReturnCard accepted an unknown lending row")
+	}
+	if err := store.ReturnCard(t.Context(), lent[0].ID, "2026-05-21"); err != nil {
+		t.Fatal(err)
+	}
+	active, err := store.ListLentCards(t.Context(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(active) != 0 {
+		t.Fatalf("active lent rows = %#v, want returned card hidden", active)
+	}
+}
+
+func TestListLentCardsReturnsEmptySliceForEmptyDatabase(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	rows, err := store.ListLentCards(t.Context(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows == nil {
+		t.Fatal("ListLentCards returned nil, want empty slice for Wails JSON arrays")
+	}
+	if len(rows) != 0 {
+		t.Fatalf("lent rows = %#v, want empty lending list", rows)
 	}
 }
 

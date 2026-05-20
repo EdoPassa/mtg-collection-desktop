@@ -54,3 +54,37 @@ func TestAppMethodsExposeCollectionWorkflow(t *testing.T) {
 		t.Fatalf("ResolverStatus() = %q, want api-only", got)
 	}
 }
+
+func TestAppListCollectionReturnsEmptySliceForEmptyDatabase(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	app := New(store, fakeResolver{}, "api-only")
+
+	rows, err := app.ListCollection()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows == nil {
+		t.Fatal("ListCollection returned nil, want empty slice for Wails JSON arrays")
+	}
+}
+
+func TestAppListLentCardsReturnsEmptySliceForEmptyDatabase(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	app := New(store, fakeResolver{}, "api-only")
+
+	rows, err := app.ListLentCards(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows == nil {
+		t.Fatal("ListLentCards returned nil, want empty slice for Wails JSON arrays")
+	}
+}

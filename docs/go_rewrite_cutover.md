@@ -15,6 +15,12 @@
 4. Verify the generated executable starts without Python installed.
 5. Verify the executable can open a migrated copy of an existing database.
 
+## Generated Artifacts
+
+- Commit `frontend/wailsjs/` when the frontend imports generated Wails bindings directly. This keeps TypeScript builds and tests reproducible without requiring every checkout to run `wails generate` first.
+- Treat `cmd/mtg-collection/assets/` as build output unless a release process explicitly needs embedded assets committed. If assets are committed, rebuild them with `npm run build --prefix frontend` and verify stale hashed files were removed.
+- Keep `frontend/package-lock.json` committed so frontend dependency resolution remains deterministic.
+
 ## Manual QA Checklist
 
 - Start with no database and confirm the app creates a usable empty collection.

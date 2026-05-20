@@ -11,7 +11,7 @@ import (
 )
 
 func bootstrapConfig() appdata.Config {
-	return appdata.Config{Mode: appdata.Development}
+	return appdata.Config{Mode: appdata.Packaged}
 }
 
 func bootstrap() (*appsvc.App, func(), error) {

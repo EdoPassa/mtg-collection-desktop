@@ -112,6 +112,9 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 		summary := lent[rows[i].Card.OracleID]
 		rows[i].LentQty = summary.TotalQuantity
 		rows[i].Available = rows[i].Quantity - rows[i].LentQty
+		if rows[i].Available < 0 {
+			rows[i].Available = 0
+		}
 	}
 	return rows, nil
 }
@@ -156,12 +159,21 @@ func (s *Service) CompareDeck(ctx context.Context, deckText string) (DeckCompare
 		}
 		if row.Owned <= 0 {
 			candidates := ownedByName[cards.NormalizeName(row.Card.Name)]
+			var positiveCandidates []storage.NameOwnedCard
 			for _, candidate := range candidates {
-				row.Owned += candidate.Quantity
+				if candidate.Quantity > 0 {
+					positiveCandidates = append(positiveCandidates, candidate)
+				}
 			}
-			if len(candidates) == 1 && candidates[0].OracleID != row.Card.OracleID && candidates[0].Quantity > 0 {
-				repairs = append(repairs, RepairCandidate{FromOracleID: candidates[0].OracleID, ToCard: row.Card})
-				unresolved = append(unresolved, "Oracle ID mismatch for "+candidates[0].Name)
+			if len(positiveCandidates) == 1 {
+				candidate := positiveCandidates[0]
+				row.Owned = candidate.Quantity
+				if candidate.OracleID != row.Card.OracleID {
+					repairs = append(repairs, RepairCandidate{FromOracleID: candidate.OracleID, ToCard: row.Card})
+					unresolved = append(unresolved, "Oracle ID mismatch for "+candidate.Name)
+				}
+			} else if len(positiveCandidates) > 1 {
+				unresolved = append(unresolved, "Ambiguous owned cards named "+row.Card.Name)
 			}
 		}
 		if row.Needed > row.Owned {

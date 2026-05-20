@@ -2,7 +2,7 @@
 
 Desktop application for tracking a Magic: The Gathering collection locally.
 
-The app is built with `PySide6`, persists data in SQLite, and resolves cards through Scryfall. It supports importing lists, comparing decklists against owned cards, building decks, and tracking lent cards.
+The active desktop app is a Go/Wails application with a React frontend. It persists data in SQLite and resolves cards through Scryfall using a bulk-first resolver with API fallback. The older Python/PySide6 implementation remains in the repository as legacy/reference code during the rewrite.
 
 ## What the app does
 
@@ -15,27 +15,33 @@ The app is built with `PySide6`, persists data in SQLite, and resolves cards thr
 
 ## Requirements
 
+- Go `1.25+`
+- Node.js and npm
+- Wails CLI for packaged builds:
+  `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 - Python `3.11+`
 - Internet access on first run (to bootstrap Scryfall bulk data cache)
 
 ## Quickstart
 
-### Windows PowerShell
+### Go/Wails Desktop
+
+```powershell
+npm install --prefix frontend
+wails dev
+```
+
+Build a Windows executable:
+
+```powershell
+.\scripts\build_windows.ps1
+```
+
+### Legacy Python App
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
-python -m mtg_collection
-```
-
-### macOS / Linux
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip install -e .
@@ -78,43 +84,40 @@ Optional:
 
 ## Data and cache
 
-- Collection database: `data/collection.sqlite3`
-- Scryfall bulk cache:
+- Development database: `data/collection.sqlite3`
+- Development Scryfall bulk cache:
   - `data/scryfall/oracle_cards.json` or `data/scryfall/oracle_cards.json.gz`
   - `data/scryfall/oracle_cards.meta.json`
+- Packaged Wails builds use the OS app-data directory under `MTG Collection`.
 
-On startup, the app attempts to prepare the Scryfall oracle bulk cache in a background thread. If that fails, the UI still starts and continues with API-only lookups.
+On startup, the app attempts to prepare the Scryfall oracle bulk cache. If that fails, the UI still starts and continues with API-only lookups.
 
 ## Project structure
 
 ```text
-src/mtg_collection/
-  __main__.py          # App entrypoint
-  db.py                # SQLite schema and persistence
-  importer.py          # TXT/CSV parsing
-  resolver.py          # Bulk-first and API-only resolution logic
-  scryfall.py          # Scryfall API client with retries/throttling
-  scryfall_bulk.py     # Bulk metadata fetch/download and streaming parsers
-  ui/                  # Main window, tabs, theme tokens/widgets
-tests/
-  test_db_decks.py
-  test_ui_theme.py
-scripts/
-  verify_resolver.py   # Resolver smoke check
+main.go                         # Wails entrypoint
+bootstrap.go                    # Packaged app bootstrap
+internal/                       # Go storage, resolver, collection service, app bindings
+frontend/src/                   # React UI
+frontend/wailsjs/               # Generated Wails bindings used by the frontend
+cmd/mtg-collection/             # CLI smoke entrypoint and embedded build assets
+src/mtg_collection/             # Legacy Python/PySide6 implementation
 ```
 
 Architecture details for contributors: `docs/architecture.md`.
 
 ## Running tests
 
-```bash
-python -m unittest discover -s tests
+```powershell
+go test ./...
+npm test --prefix frontend
+npm run build --prefix frontend
 ```
 
-Resolver smoke test:
+Legacy Python tests:
 
 ```bash
-python scripts/verify_resolver.py
+python -m unittest discover -s tests
 ```
 
 ## Troubleshooting

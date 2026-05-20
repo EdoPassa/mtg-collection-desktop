@@ -57,6 +57,21 @@ func TestPreviewAndCommitImportIncrementCollection(t *testing.T) {
 	}
 }
 
+func TestListCollectionReturnsEmptySliceForEmptyCollection(t *testing.T) {
+	service := newTestService(t)
+
+	rows, err := service.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows == nil {
+		t.Fatal("ListCollection returned nil, want empty slice for frontend arrays")
+	}
+	if len(rows) != 0 {
+		t.Fatalf("collection = %#v, want empty collection", rows)
+	}
+}
+
 func TestCompareBuildDeckAndLendingUseCases(t *testing.T) {
 	service := newTestService(t)
 	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n")
@@ -94,6 +109,71 @@ func TestCompareBuildDeckAndLendingUseCases(t *testing.T) {
 	}
 	if rows[0].Available != rows[0].Quantity-rows[0].LentQty {
 		t.Fatalf("availability not derived from lending: %#v", rows[0])
+	}
+}
+
+func TestListCollectionDoesNotReportNegativeAvailability(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CommitImport(t.Context(), preview.Validated); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.LendCard(t.Context(), storage.LendInput{OracleID: "oracle-bolt", Quantity: 2, BorrowerName: "Alice", LentDate: "2026-05-20"}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := service.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("collection = %#v, want one row", rows)
+	}
+	if rows[0].Available != 0 {
+		t.Fatalf("available = %d, want capped zero when lent exceeds owned", rows[0].Available)
+	}
+}
+
+func TestCompareDeckDoesNotUseAmbiguousNameFallbackAsOwnedQuantity(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	oldOne := cards.CardIdentity{OracleID: "old-shock-one", Name: "Shock", ScryfallURI: "https://example.test/old-one"}
+	oldTwo := cards.CardIdentity{OracleID: "old-shock-two", Name: "Shock", ScryfallURI: "https://example.test/old-two"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{oldOne, oldTwo}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollectionBatch(t.Context(), []storage.QuantityChange{
+		{OracleID: oldOne.OracleID, Quantity: 2},
+		{OracleID: oldTwo.OracleID, Quantity: 1},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(store, fakeResolver{cards: map[string]scryfall.Card{
+		"Shock": {OracleID: "new-shock", Name: "Shock", ScryfallURI: "https://example.test/new"},
+	}})
+
+	compare, err := service.CompareDeck(t.Context(), "1 Shock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(compare.Rows) != 1 {
+		t.Fatalf("compare rows = %#v, want one row", compare.Rows)
+	}
+	row := compare.Rows[0]
+	if row.Owned != 0 || row.Missing != 1 {
+		t.Fatalf("ambiguous fallback row = %#v, want owned 0 and missing 1", row)
+	}
+	if !compare.HasUnresolved || len(compare.Unresolved) == 0 {
+		t.Fatalf("compare = %#v, want unresolved ambiguous fallback warning", compare)
+	}
+	if len(compare.Repairs) != 0 {
+		t.Fatalf("repairs = %#v, want no automatic repair for ambiguous fallback", compare.Repairs)
 	}
 }
 

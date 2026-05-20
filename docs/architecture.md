@@ -4,52 +4,66 @@ This document explains how the MTG Collection Desktop app is organized and how d
 
 ## Runtime overview
 
-1. `python -m mtg_collection` starts the Qt application from `src/mtg_collection/__main__.py`.
-2. `run_app()` in `src/mtg_collection/ui/main_window.py`:
-   - applies the global UI theme;
-   - opens SQLite through `CollectionDb`;
-   - starts resolver bootstrap in a background thread.
+1. `wails dev` or the packaged executable starts the Wails application from `main.go`.
+2. `bootstrap()` in `bootstrap.go`:
+   - resolves packaged app-data paths through `internal/appdata`;
+   - opens SQLite through `internal/storage`;
+   - creates the Scryfall client and card resolver.
 3. Resolver bootstrap attempts bulk-first mode:
    - ensure Scryfall bulk cache exists and is fresh;
    - build in-memory indexes for name/id lookup;
    - fall back to API-only resolver if bootstrap fails.
-4. `MainWindow` wires five tabs (import, collection, deck compare, deck builder, lent cards) to DB + resolver operations.
+4. Wails binds `internal/app.App` methods into `frontend/wailsjs`.
+5. `frontend/src/App.tsx` renders the React workflows and calls the generated Wails bindings through a typed adapter.
 
 ## Module boundaries
 
-- `src/mtg_collection/db.py`
-  - owns SQLite schema migration/bootstrap (`SCHEMA_SQL`);
+- `internal/storage`
+  - owns SQLite schema migration/bootstrap (`schemaSQL`);
   - exposes CRUD-like operations for cards, collection quantities, decks, and lending;
   - central place for persistence constraints and SQL behavior.
 
-- `src/mtg_collection/importer.py`
+- `internal/importer`
   - parses user input into normalized `ImportLine` records;
   - supports both TXT and CSV;
   - returns `(parsed_rows, unresolved_rows)` for caller-side UX messaging.
 
-- `src/mtg_collection/scryfall.py`
+- `internal/scryfall`
   - low-level Scryfall HTTP client;
   - throttling, retries, backoff, and API response validation;
   - maps responses into minimal `ScryfallCard` identity objects.
+
+- `internal/resolver`
+  - high-level card resolution abstraction;
+  - bulk-first resolver uses the local Oracle index, then API fallback;
+  - API-only resolver is used when cache bootstrap fails.
+
+- `internal/collection`
+  - coordinates import preview/commit, deck compare/build, repair, and lending use cases;
+  - keeps UI-facing behavior independent from SQLite query details.
+
+- `internal/app`
+  - Wails-bound facade over `internal/collection`;
+  - converts UI calls into service operations with desktop-safe defaults.
+
+- `internal/appdata`
+  - resolves development versus packaged data/cache locations;
+  - migrates repo-local data into the app-data directory when needed.
+
+- `frontend/src`
+  - React application shell and workflow panels;
+  - uses generated `frontend/wailsjs` models/bindings instead of hand-written API shapes.
+
+Legacy Python modules in `src/mtg_collection` mirror many of these responsibilities and remain useful as behavioral reference until the rewrite is retired.
 
 - `src/mtg_collection/scryfall_bulk.py`
   - fetches bulk metadata from `/bulk-data`;
   - downloads and caches oracle cards payload to `data/scryfall/`;
   - streams JSON/JSON.GZ efficiently (uses `ijson` when available).
 
-- `src/mtg_collection/resolver.py`
-  - high-level card resolution abstraction (`CardResolver`);
-  - `BulkFirstResolver`: in-memory bulk index first, then API fallback;
-  - `ApiOnlyResolver`: direct API path used as fallback mode.
-
-- `src/mtg_collection/ui/`
-  - `main_window.py` coordinates app state and tab actions;
-  - `tabs/*` builds tab-specific widgets and accessible controls;
-  - `theme/*` centralizes design tokens + helper widget styling.
-
 ## Data model
 
-Tables created by `CollectionDb`:
+Tables created by `internal/storage`:
 
 - `cards`: canonical identity (`oracle_id`, `name`, `scryfall_uri`)
 - `collection_items`: owned quantity per card
@@ -65,11 +79,12 @@ Design notes:
 
 ## Import and validation flow
 
-1. User selects import mode (TXT or CSV file).
-2. Parser converts rows to `ImportLine`.
-3. Resolver validates each line to canonical card identity.
-4. UI displays validated rows and unresolved entries.
-5. Commit step upserts card metadata and increments collection in one transaction block.
+1. User enters card rows in the React import panel.
+2. Wails calls `App.PreviewTextImport` or `App.PreviewCSVImport`.
+3. `internal/importer` converts rows to `ImportLine`.
+4. `internal/resolver` validates each line to canonical card identity.
+5. UI displays validated rows and unresolved entries.
+6. Commit step upserts card metadata and increments collection in one transaction block.
 
 ## Deck compare flow
 
@@ -77,18 +92,17 @@ Design notes:
 2. Wanted quantities are compared against owned quantities.
 3. If name fallback detects a likely oracle mismatch, UI can trigger repair.
 4. Repair migrates collection quantity from old oracle id to resolved oracle id.
-5. Result table can be filtered (`All cards` / `Missing cards`) and exported as CSV.
+5. UI refreshes compare results after repair so stale warnings disappear.
 
 ## Tests
 
-- `tests/test_db_decks.py`: DB behavior for decks and in-deck status derivation.
-- `tests/test_ui_theme.py`:
-  - design token and stylesheet checks;
-  - tab builder import/accessibility checks;
-  - `MainWindow` smoke coverage for baseline tab wiring.
+- `internal/.../*_test.go`: Go storage, resolver, collection, app-data, and Wails facade behavior.
+- `frontend/src/*.test.tsx`: React workflow coverage with mocked Wails APIs.
+- `tests/`: legacy Python coverage retained for the reference implementation.
 
 Run all tests:
 
-```bash
-python -m unittest discover -s tests
+```powershell
+go test ./...
+npm test --prefix frontend
 ```
