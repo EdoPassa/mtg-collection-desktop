@@ -1,9 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { BackendApi, CollectionItem, DeckCompareResult, DeckCompareRow, ImportPreview, LentCard } from "./backend";
+import type { BackendApi, CollectionItem, DeckCompareResult, ImportPreview, LentCard } from "./backend";
 
+const sections = [
+  { id: "Import", icon: "↓", description: "Validate and add cards" },
+  { id: "Collection", icon: "◆", description: "Browse owned cards" },
+  { id: "Decks / Compare", icon: "⚔", description: "Compare decklists" },
+  { id: "Lending", icon: "↔", description: "Track lent cards" }
+] as const;
 
-const sections = ["Import", "Collection", "Decks / Compare", "Lending"] as const;
-type Section = (typeof sections)[number];
+type Section = (typeof sections)[number]["id"];
+
+const sectionTitles: Record<Section, string> = {
+  Import: "Import Cards",
+  Collection: "Collection",
+  "Decks / Compare": "Decks / Compare",
+  Lending: "Lending"
+};
 
 export function App({ api }: { api: BackendApi }) {
   const [active, setActive] = useState<Section>("Import");
@@ -14,39 +26,92 @@ export function App({ api }: { api: BackendApi }) {
     api.ResolverStatus().then(setStatus).catch((error) => setStatus(`error: ${String(error)}`));
   }, [api]);
 
+  const messageIsError = message.toLowerCase().includes("error") || message.startsWith("TypeError");
+
   return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div>
-          <h1>MTG Collection</h1>
-          <p>Local collection tracking backed by Go, SQLite, and Scryfall.</p>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brand-mark" aria-hidden="true">
+            MTG
+          </div>
+          <p className="brand-title">MTG Collection</p>
+          <p>Local tracker · Scryfall</p>
         </div>
-        <span className="status-pill">Resolver: {status}</span>
-      </header>
 
-      <nav aria-label="Application sections" className="tabs">
-        {sections.map((section) => (
-          <button
-            key={section}
-            type="button"
-            aria-current={active === section ? "page" : undefined}
-            onClick={() => {
-              setActive(section);
-              setMessage("");
-            }}
-          >
-            {section}
-          </button>
-        ))}
-      </nav>
+        <nav aria-label="Application sections" className="tabs">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className="tab-btn"
+              aria-current={active === section.id ? "page" : undefined}
+              onClick={() => {
+                setActive(section.id);
+                setMessage("");
+              }}
+            >
+              <span className="tab-icon" aria-hidden="true">
+                {section.icon}
+              </span>
+              {section.id}
+            </button>
+          ))}
+        </nav>
 
-      {message && <p className="message">{message}</p>}
+        <div className="sidebar-footer">
+          <StatusPill status={status} />
+        </div>
+      </aside>
 
-      {active === "Import" && <ImportPanel api={api} setMessage={setMessage} />}
-      {active === "Collection" && <CollectionPanel api={api} setMessage={setMessage} />}
-      {active === "Decks / Compare" && <DeckPanel api={api} setMessage={setMessage} />}
-      {active === "Lending" && <LendingPanel api={api} setMessage={setMessage} />}
-    </main>
+      <div className="app-main">
+        <header className="app-header">
+          <div>
+            <h2>{sectionTitles[active]}</h2>
+            <p className="subtitle">{sections.find((s) => s.id === active)?.description}</p>
+          </div>
+        </header>
+
+        {message && <p className={`message${messageIsError ? " message--error" : ""}`}>{message}</p>}
+
+        {active === "Import" && <ImportPanel api={api} setMessage={setMessage} />}
+        {active === "Collection" && <CollectionPanel api={api} setMessage={setMessage} />}
+        {active === "Decks / Compare" && <DeckPanel api={api} setMessage={setMessage} />}
+        {active === "Lending" && <LendingPanel api={api} setMessage={setMessage} />}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const variant = status.startsWith("error")
+    ? "error"
+    : status === "loading"
+      ? "loading"
+      : "ready";
+
+  return (
+    <span className={`status-pill status-pill--${variant}`} title={status}>
+      Resolver: {status}
+    </span>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number | string; tone?: "success" | "warning" | "danger" }) {
+  return (
+    <div className={`stat${tone ? ` stat--${tone}` : ""}`}>
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
+    </div>
+  );
+}
+
+function EmptyState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="empty-state">
+      <strong>{title}</strong>
+      <p>{detail}</p>
+    </div>
   );
 }
 
@@ -82,14 +147,13 @@ function ImportPanel({ api, setMessage }: { api: BackendApi; setMessage: (messag
   }
 
   return (
-    <section className="panel">
-      <h2>Import Cards</h2>
+    <section className="panel" aria-label="Import Cards">
       <label>
         Card list
-        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={8} />
+        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={8} placeholder="4 Lightning Bolt&#10;2x Counterspell" />
       </label>
       <div className="actions">
-        <button type="button" onClick={previewImport} disabled={busy}>
+        <button type="button" className="primary" onClick={previewImport} disabled={busy}>
           Validate
         </button>
         <button type="button" onClick={commitImport} disabled={busy || preview.validated.length === 0}>
@@ -97,7 +161,7 @@ function ImportPanel({ api, setMessage }: { api: BackendApi; setMessage: (messag
         </button>
       </div>
       <ResultList title="Validated" rows={preview.validated.map((row) => `${row.line.quantity}x ${row.name} (${row.source})`)} />
-      <ResultList title="Unresolved" rows={preview.unresolved} />
+      <ResultList title="Unresolved" rows={preview.unresolved} warn={preview.unresolved.length > 0} />
     </section>
   );
 }
@@ -124,26 +188,31 @@ function CollectionPanel({ api, setMessage }: { api: BackendApi; setMessage: (me
   );
 
   return (
-    <section className="panel">
-      <h2>Collection</h2>
+    <section className="panel" aria-label="Collection">
       <div className="toolbar">
-        <input aria-label="Search collection" placeholder="Search cards" value={query} onChange={(event) => setQuery(event.target.value)} />
-        <button type="button" onClick={load}>
+        <input aria-label="Search collection" placeholder="Search cards…" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <button type="button" className="ghost" onClick={load}>
           Refresh
         </button>
       </div>
-      <div className="card-grid">
-        {filtered.map((row) => (
-          <article key={row.card.oracleId} className="card-row">
-            <h3>{row.card.name}</h3>
-            <p>Owned: {row.quantity}</p>
-            <p>Lent: {row.lentQty}</p>
-            <p>Available: {row.available}</p>
-            <p>{row.inDeck ? "In deck" : "Not in deck"}</p>
-          </article>
-        ))}
-      </div>
-      {filtered.length === 0 && <p>No cards found.</p>}
+      {filtered.length === 0 ? (
+        <EmptyState title="No cards found." detail={rows.length === 0 ? "Import a list to start building your collection." : "Try a different search term."} />
+      ) : (
+        <div className="card-grid">
+          {filtered.map((row) => (
+            <article key={row.card.oracleId} className="card-row">
+              <h3>{row.card.name}</h3>
+              <div className="stat-row">
+                <Stat label="Owned" value={row.quantity} />
+                <Stat label="Lent" value={row.lentQty} tone={row.lentQty > 0 ? "warning" : undefined} />
+                <Stat label="Available" value={row.available} tone="success" />
+              </div>
+              <p className="sr-only">Available: {row.available}</p>
+              <span className={`badge ${row.inDeck ? "badge--deck" : "badge--free"}`}>{row.inDeck ? "In deck" : "Not in deck"}</span>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -187,35 +256,43 @@ function DeckPanel({ api, setMessage }: { api: BackendApi; setMessage: (message:
   const repairRows = result.repairs.map((repair) => `Repair ${repair.fromOracleId} to ${repair.toCard.name}`);
 
   return (
-    <section className="panel">
-      <h2>Decks / Compare</h2>
+    <section className="panel" aria-label="Decks / Compare">
       <label>
         Decklist
-        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={8} />
+        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={8} placeholder="One card per line…" />
       </label>
-      <div className="actions">
-        <button type="button" onClick={compare}>
+      <div className="actions compare-toolbar">
+        <button type="button" className="primary" onClick={compare}>
           Compare
         </button>
         <input aria-label="New deck name" placeholder="New deck name" value={deckName} onChange={(event) => setDeckName(event.target.value)} />
         <button type="button" onClick={buildDeck} disabled={!canBuild}>
           Build Deck
         </button>
-        <button type="button" onClick={repair} disabled={result.repairs.length === 0}>
+        <button type="button" className="ghost" onClick={repair} disabled={result.repairs.length === 0}>
           Repair Mismatches
         </button>
       </div>
-      <div className="card-grid">
-        {result.rows.map((row) => (
-          <article key={row.card.oracleId} className="card-row">
-            <h3>{row.card.name}</h3>
-            <p>Needed: {row.needed}</p>
-            <p>Owned: {row.owned}</p>
-            <p>Missing: {row.missing}</p>
-          </article>
-        ))}
-      </div>
-      <ResultList title="Compare warnings" rows={result.unresolved} />
+      {result.rows.length === 0 ? (
+        <EmptyState title="No comparison yet" detail="Paste a decklist and run Compare to see owned vs missing." />
+      ) : (
+        <div className="card-grid">
+          {result.rows.map((row) => (
+            <article key={row.card.oracleId} className="card-row">
+              <h3>{row.card.name}</h3>
+              <div className="stat-row">
+                <Stat label="Needed" value={row.needed} />
+                <Stat label="Owned" value={row.owned} />
+                <Stat label="Missing" value={row.missing} tone={row.missing > 0 ? "danger" : "success"} />
+              </div>
+              <span className={`badge ${row.missing === 0 ? "badge--complete" : "badge--missing"}`}>
+                {row.missing === 0 ? "Complete" : `${row.missing} short`}
+              </span>
+            </article>
+          ))}
+        </div>
+      )}
+      <ResultList title="Compare warnings" rows={result.unresolved} warn={result.unresolved.length > 0} />
       {repairRows.length > 0 && <ResultList title="Repair candidates" rows={repairRows} />}
     </section>
   );
@@ -267,36 +344,40 @@ function LendingPanel({ api, setMessage }: { api: BackendApi; setMessage: (messa
   }
 
   return (
-    <section className="panel">
-      <h2>Lending</h2>
+    <section className="panel" aria-label="Lending">
       <div className="toolbar">
         <input aria-label="Oracle ID" placeholder="Oracle ID" value={oracleId} onChange={(event) => setOracleId(event.target.value)} />
-        <input aria-label="Borrower" placeholder="Borrower" value={borrower} onChange={(event) => setBorrower(event.target.value)} />
-        <button type="button" onClick={lend} disabled={!oracleId.trim() || !borrower.trim()}>
+        <input aria-label="Borrower" placeholder="Borrower name" value={borrower} onChange={(event) => setBorrower(event.target.value)} />
+        <button type="button" className="primary" onClick={lend} disabled={!oracleId.trim() || !borrower.trim()}>
           Add Lending Record
         </button>
       </div>
-      <div className="card-grid">
-        {rows.map((row) => (
-          <article key={row.id} className="card-row">
-            <h3>{row.card.name}</h3>
-            <p>Borrower: {row.borrowerName}</p>
-            <p>Quantity: {row.quantity}</p>
-            <p>Lent: {row.lentDate}</p>
-            <button type="button" onClick={() => markReturned(row.id)}>
-              Mark Returned
-            </button>
-          </article>
-        ))}
-      </div>
-      {rows.length === 0 && <p>No active lending records.</p>}
+      {rows.length === 0 ? (
+        <EmptyState title="No active lending records." detail="Lent cards you track will appear here until marked returned." />
+      ) : (
+        <div className="card-grid">
+          {rows.map((row) => (
+            <article key={row.id} className="card-row">
+              <h3>{row.card.name}</h3>
+              <div className="stat-row">
+                <Stat label="Qty" value={row.quantity} />
+                <Stat label="Lent" value={row.lentDate} />
+              </div>
+              <p className="card-meta">Borrower: {row.borrowerName}</p>
+              <button type="button" className="ghost" onClick={() => markReturned(row.id)}>
+                Mark Returned
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-function ResultList({ title, rows }: { title: string; rows: string[] }) {
+function ResultList({ title, rows, warn }: { title: string; rows: string[]; warn?: boolean }) {
   return (
-    <div className="result-list">
+    <div className={`result-list${warn ? " result-list--warn" : ""}`}>
       <h3>{title}</h3>
       {rows.length === 0 ? (
         <p>None.</p>
