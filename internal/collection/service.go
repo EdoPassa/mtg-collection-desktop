@@ -19,6 +19,11 @@ type Store interface {
 	ListCollection(ctx context.Context) ([]cards.CollectionItem, error)
 	CreateDeck(ctx context.Context, name string) (int64, error)
 	ListDecks(ctx context.Context) ([]cards.Deck, error)
+	ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCard, error)
+	DeleteDeck(ctx context.Context, deckID int64) error
+	RenameDeck(ctx context.Context, deckID int64, name string) error
+	SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error
+	AddCardToDeck(ctx context.Context, deckID int64, card cards.CardIdentity, qty int) error
 	ReplaceDeckCards(ctx context.Context, deckID int64, rows []cards.DeckCard) error
 	GetOwnedByOracleID(ctx context.Context) (map[string]storage.OwnedCard, error)
 	GetOwnedByNormalizedName(ctx context.Context) (map[string][]storage.NameOwnedCard, error)
@@ -239,6 +244,34 @@ func (s *Service) ListDecks(ctx context.Context) ([]cards.Deck, error) {
 	return s.store.ListDecks(ctx)
 }
 
+func (s *Service) ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCard, error) {
+	return nonNilDeckCards(s.store.ListDeckCards(ctx, deckID))
+}
+
+func (s *Service) DeleteDeck(ctx context.Context, deckID int64) error {
+	return s.store.DeleteDeck(ctx, deckID)
+}
+
+func (s *Service) RenameDeck(ctx context.Context, deckID int64, name string) error {
+	return s.store.RenameDeck(ctx, deckID, name)
+}
+
+func (s *Service) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error {
+	return s.store.SetDeckCardQuantity(ctx, deckID, oracleID, qty)
+}
+
+func (s *Service) AddCardToDeckByName(ctx context.Context, deckID int64, name string, qty int) error {
+	if qty <= 0 {
+		return errors.New("quantity must be > 0")
+	}
+	result, err := s.resolver.ResolveName(ctx, name)
+	if err != nil {
+		return err
+	}
+	card := cards.CardIdentity{OracleID: result.Card.OracleID, Name: result.Card.Name, ScryfallURI: result.Card.ScryfallURI}
+	return s.store.AddCardToDeck(ctx, deckID, card, qty)
+}
+
 func (s *Service) LendCard(ctx context.Context, input storage.LendInput) error {
 	return s.store.LendCard(ctx, input)
 }
@@ -302,6 +335,13 @@ func nonNilSlice[T any](items []T) []T {
 		return []T{}
 	}
 	return items
+}
+
+func nonNilDeckCards(items []cards.DeckCard, err error) ([]cards.DeckCard, error) {
+	if err != nil {
+		return nil, err
+	}
+	return nonNilSlice(items), nil
 }
 
 func itoa(v int) string {

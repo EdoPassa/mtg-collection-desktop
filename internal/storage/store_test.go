@@ -44,7 +44,7 @@ func TestListCollectionReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 	}
 }
 
-func TestDeckAndLendingSemanticsMatchPythonApp(t *testing.T) {
+func TestDeckAndLendingSemantics(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()
 
@@ -92,6 +92,67 @@ func TestDeckAndLendingSemanticsMatchPythonApp(t *testing.T) {
 	}
 	if !rows[0].InDeck || rows[0].Quantity != 4 {
 		t.Fatalf("collection after deck/lend = %#v, want in deck and collection qty unchanged", rows)
+	}
+}
+
+func TestDeckCRUD(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	card := cards.CardIdentity{OracleID: "oracle-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{card}); err != nil {
+		t.Fatal(err)
+	}
+	deckID, err := store.CreateDeck(t.Context(), "Burn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddCardToDeck(t.Context(), deckID, card, 4); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.SetDeckCardQuantity(t.Context(), deckID, card.OracleID, 2); err != nil {
+		t.Fatal(err)
+	}
+	deckCards, err := store.ListDeckCards(t.Context(), deckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deckCards) != 1 || deckCards[0].Quantity != 2 {
+		t.Fatalf("deck cards after set qty = %#v, want qty 2", deckCards)
+	}
+
+	if err := store.SetDeckCardQuantity(t.Context(), deckID, card.OracleID, 0); err != nil {
+		t.Fatal(err)
+	}
+	deckCards, err = store.ListDeckCards(t.Context(), deckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deckCards) != 0 {
+		t.Fatalf("deck cards after remove = %#v, want empty", deckCards)
+	}
+
+	if err := store.RenameDeck(t.Context(), deckID, "Mono Red"); err != nil {
+		t.Fatal(err)
+	}
+	decks, err := store.ListDecks(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decks) != 1 || decks[0].Name != "Mono Red" {
+		t.Fatalf("decks after rename = %#v, want Mono Red", decks)
+	}
+
+	if err := store.DeleteDeck(t.Context(), deckID); err != nil {
+		t.Fatal(err)
+	}
+	decks, err = store.ListDecks(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decks) != 0 {
+		t.Fatalf("decks after delete = %#v, want empty", decks)
 	}
 }
 

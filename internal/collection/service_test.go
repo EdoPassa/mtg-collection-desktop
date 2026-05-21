@@ -147,6 +147,44 @@ func TestCompareBuildDeckAndLendingUseCases(t *testing.T) {
 	}
 }
 
+func TestAddCardToDeckByName(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CommitImport(t.Context(), preview.Validated); err != nil {
+		t.Fatal(err)
+	}
+	compare, err := service.CompareDeck(t.Context(), "4 Lightning Bolt\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deckID, err := service.BuildDeckFromCompare(t.Context(), BuildDeckInput{Name: "Burn", Rows: compare.Rows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.AddCardToDeckByName(t.Context(), deckID, "Counterspell", 2); err != nil {
+		t.Fatal(err)
+	}
+	deckCards, err := service.ListDeckCards(t.Context(), deckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deckCards) != 2 {
+		t.Fatalf("deck cards = %#v, want bolt and counterspell", deckCards)
+	}
+	var counterQty int
+	for _, row := range deckCards {
+		if row.Card.Name == "Counterspell" {
+			counterQty = row.Quantity
+		}
+	}
+	if counterQty != 2 {
+		t.Fatalf("counterspell qty = %d, want 2", counterQty)
+	}
+}
+
 func TestListCollectionDoesNotReportNegativeAvailability(t *testing.T) {
 	service := newTestService(t)
 	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n")

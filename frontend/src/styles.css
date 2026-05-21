@@ -435,6 +435,70 @@ label {
   text-transform: uppercase;
 }
 
+.deck-browser {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  min-height: 320px;
+}
+
+.deck-browser-list,
+.deck-browser-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.deck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.deck-list-item {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  width: 100%;
+}
+
+.deck-list-item:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+}
+
+.deck-list-item--active {
+  background: var(--gold-soft);
+  border-color: rgba(212, 175, 55, 0.45);
+}
+
+.deck-list-name {
+  font-weight: 600;
+}
+
+.deck-detail-toolbar {
+  flex-wrap: wrap;
+}
+
+.deck-card-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.deck-card-actions input[type="number"] {
+  max-width: 4rem;
+}
+
 .card-grid {
   display: grid;
   gap: 1rem;

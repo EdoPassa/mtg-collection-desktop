@@ -309,6 +309,66 @@ func (s *Store) ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCa
 	return out, rows.Err()
 }
 
+func (s *Store) DeleteDeck(ctx context.Context, deckID int64) error {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM decks WHERE id = ?", deckID)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.New("deck does not exist")
+	}
+	return nil
+}
+
+func (s *Store) RenameDeck(ctx context.Context, deckID int64, name string) error {
+	deckName := strings.TrimSpace(name)
+	if deckName == "" {
+		return errors.New("deck name cannot be empty")
+	}
+	res, err := s.db.ExecContext(ctx, "UPDATE decks SET name = ? WHERE id = ?", deckName, deckID)
+	if err != nil {
+		return fmt.Errorf("deck already exists: %s", deckName)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return errors.New("deck does not exist")
+	}
+	return nil
+}
+
+func (s *Store) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	var exists int
+	if err := tx.QueryRowContext(ctx, "SELECT 1 FROM decks WHERE id = ?", deckID).Scan(&exists); err != nil {
+		return errors.New("deck does not exist")
+	}
+	if qty <= 0 {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM deck_cards WHERE deck_id = ? AND oracle_id = ?", deckID, oracleID); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO deck_cards (deck_id, oracle_id, quantity)
+		VALUES (?, ?, ?)
+		ON CONFLICT(deck_id, oracle_id) DO UPDATE SET quantity = excluded.quantity
+	`, deckID, oracleID, qty); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *Store) GetOwnedByOracleID(ctx context.Context) (map[string]OwnedCard, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT ci.oracle_id, c.name, c.scryfall_uri, ci.quantity

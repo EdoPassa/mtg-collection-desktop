@@ -17,6 +17,11 @@ function fakeApi(): BackendApi {
     CompareDeck: vi.fn().mockResolvedValue({ rows: [], unresolved: [], repairs: [], hasUnresolved: false }),
     BuildDeckFromCompare: vi.fn().mockResolvedValue(1),
     ListDecks: vi.fn().mockResolvedValue([]),
+    ListDeckCards: vi.fn().mockResolvedValue([]),
+    DeleteDeck: vi.fn().mockResolvedValue(undefined),
+    RenameDeck: vi.fn().mockResolvedValue(undefined),
+    SetDeckCardQuantity: vi.fn().mockResolvedValue(undefined),
+    AddCardToDeckByName: vi.fn().mockResolvedValue(undefined),
     LendCard: vi.fn().mockResolvedValue(undefined),
     ListLentCards: vi.fn().mockResolvedValue([]),
     ReturnCard: vi.fn().mockResolvedValue(undefined),
@@ -33,6 +38,74 @@ describe("App", () => {
 
     expect(await screen.findByRole("heading", { name: "Collection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Collection" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("loads and displays saved decks", async () => {
+    const api = fakeApi();
+    vi.mocked(api.ListDecks).mockResolvedValue([
+      { id: 1, name: "Burn" },
+      { id: 2, name: "Control" }
+    ]);
+    vi.mocked(api.ListDeckCards).mockResolvedValue([
+      {
+        card: { oracleId: "oracle-bolt", name: "Lightning Bolt", scryfallUri: "https://example.test/bolt" },
+        quantity: 4
+      }
+    ]);
+
+    render(<App api={api} />);
+    await userEvent.click(screen.getByRole("button", { name: "Decks" }));
+
+    expect(await screen.findByRole("heading", { name: "Decks" })).toBeInTheDocument();
+    expect(screen.getByText("Burn")).toBeInTheDocument();
+    expect(screen.getByText("Control")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Burn" }));
+    expect(await screen.findByText("Lightning Bolt")).toBeInTheDocument();
+    expect(api.ListDeckCards).toHaveBeenCalledWith(1);
+  });
+
+  it("renames and deletes decks through the backend", async () => {
+    const api = fakeApi();
+    vi.mocked(api.ListDecks).mockResolvedValue([{ id: 7, name: "Burn" }]);
+    vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+
+    render(<App api={api} />);
+    await userEvent.click(screen.getByRole("button", { name: "Decks" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
+
+    const nameInput = screen.getByLabelText("Deck name");
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, "Mono Red");
+    await userEvent.click(screen.getByRole("button", { name: "Save name" }));
+
+    expect(api.RenameDeck).toHaveBeenCalledWith(7, "Mono Red");
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete deck" }));
+    expect(api.DeleteDeck).toHaveBeenCalledWith(7);
+  });
+
+  it("adds and updates deck cards through the backend", async () => {
+    const api = fakeApi();
+    vi.mocked(api.ListDecks).mockResolvedValue([{ id: 3, name: "Burn" }]);
+    vi.mocked(api.ListDeckCards).mockResolvedValue([
+      {
+        card: { oracleId: "oracle-bolt", name: "Lightning Bolt", scryfallUri: "https://example.test/bolt" },
+        quantity: 2
+      }
+    ]);
+
+    render(<App api={api} />);
+    await userEvent.click(screen.getByRole("button", { name: "Decks" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
+    await userEvent.click(await screen.findByRole("button", { name: "+" }));
+
+    expect(api.SetDeckCardQuantity).toHaveBeenCalledWith(3, "oracle-bolt", 3);
+
+    await userEvent.type(screen.getByLabelText("Card name to add"), "Counterspell");
+    await userEvent.click(screen.getByRole("button", { name: "Add card" }));
+
+    expect(api.AddCardToDeckByName).toHaveBeenCalledWith(3, "Counterspell", 1);
   });
 
   it("loads collection data from the backend", async () => {
