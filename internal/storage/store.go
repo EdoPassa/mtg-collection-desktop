@@ -1,3 +1,4 @@
+// Package storage persists cards, collection quantities, decks, and lending records in SQLite.
 package storage
 
 import (
@@ -343,6 +344,7 @@ func (s *Store) RenameDeck(ctx context.Context, deckID int64, name string) error
 	return nil
 }
 
+// SetDeckCardQuantity sets qty to 0 to remove the card from the deck entirely.
 func (s *Store) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -414,6 +416,8 @@ func (s *Store) GetOwnedByNormalizedName(ctx context.Context) (map[string][]Name
 	return out, rows.Err()
 }
 
+// MoveCollectionQuantity reassigns all copies from one oracle ID to another.
+// Used when Scryfall oracle IDs change but the physical card is the same.
 func (s *Store) MoveCollectionQuantity(ctx context.Context, fromOracleID string, toCard cards.CardIdentity) error {
 	fromOracleID = strings.TrimSpace(fromOracleID)
 	toCard.OracleID = strings.TrimSpace(toCard.OracleID)

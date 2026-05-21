@@ -14,6 +14,9 @@ func bootstrapConfig() appdata.Config {
 	return appdata.Config{Mode: appdata.Development}
 }
 
+// bootstrap wires storage, Scryfall bulk cache, and the card resolver at startup.
+// When the oracle_cards bulk file is present, lookups use "bulk-first" (local then API);
+// otherwise the app falls back to live API calls only.
 func bootstrap() (*appsvc.App, func(), error) {
 	paths := appdata.ResolvePaths(bootstrapConfig())
 	store, err := storage.Open(paths.DatabasePath)

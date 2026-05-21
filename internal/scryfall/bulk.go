@@ -49,6 +49,7 @@ func DefaultBulkCachePaths() BulkCachePaths {
 	}
 }
 
+// EnsureOracleBulkDownloaded downloads oracle_cards if missing or older than refreshAfter (default 7 days).
 func EnsureOracleBulkDownloaded(ctx context.Context, opts BulkOptions) (BulkCachePaths, error) {
 	paths := opts.Paths
 	if paths.RootDir == "" {

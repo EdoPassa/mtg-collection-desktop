@@ -60,6 +60,7 @@ func NewClient(opts Options) *Client {
 	return &Client{baseURL: baseURL, httpClient: httpClient, userAgent: userAgent, minInterval: minInterval, maxAttempts: maxAttempts}
 }
 
+// LookupNamed tries an exact name match first, then a fuzzy match (Scryfall's default behavior).
 func (c *Client) LookupNamed(ctx context.Context, name string) (Card, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -174,6 +175,7 @@ func (c *Client) requestJSON(ctx context.Context, path string, values url.Values
 	return nil, false, lastErr
 }
 
+// throttle enforces Scryfall's recommended minimum interval between API requests.
 func (c *Client) throttle(ctx context.Context) error {
 	if c.minInterval <= 0 {
 		return nil

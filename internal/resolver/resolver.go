@@ -1,3 +1,5 @@
+// Package resolver maps import lines and card names to Scryfall card identities.
+// Lookups prefer the local oracle_cards bulk cache when available, falling back to the live API.
 package resolver
 
 import (
@@ -25,16 +27,20 @@ type API interface {
 	LookupScryfallID(ctx context.Context, scryfallID string) (scryfall.Card, error)
 }
 
+// BulkOracleIndex is an in-memory index built from Scryfall's oracle_cards bulk file.
+// Duplicate names keep the first occurrence only (oracle_cards has one row per oracle card).
 type BulkOracleIndex struct {
 	byName       map[string]scryfall.Card
 	byScryfallID map[string]scryfall.Card
 }
 
+// BulkFirst resolves cards locally first, then calls the Scryfall API on cache miss.
 type BulkFirst struct {
 	index BulkOracleIndex
 	api   API
 }
 
+// APIOnly always uses the live Scryfall API (fallback when bulk data is unavailable).
 type APIOnly struct {
 	api API
 }

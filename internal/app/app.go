@@ -1,3 +1,5 @@
+// Package app exposes collection operations to the Wails frontend.
+// Each method delegates to collection.Service with a background context.
 package app
 
 import (

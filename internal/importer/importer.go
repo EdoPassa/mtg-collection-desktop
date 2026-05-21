@@ -1,3 +1,7 @@
+// Package importer parses decklists and CSV exports into normalized import lines.
+//
+// Text format accepts "4 Lightning Bolt", "4x Lightning Bolt", or "Lightning Bolt x4".
+// Lines starting with # and blank lines are ignored.
 package importer
 
 import (
@@ -46,6 +50,7 @@ func ParseText(text string) ([]ImportLine, []string) {
 
 func ParseCSVBytes(data []byte) ([]ImportLine, []string) {
 	reader := csv.NewReader(bytes.NewReader(data))
+	// Allow rows with a variable number of columns (extra fields are ignored).
 	reader.FieldsPerRecord = -1
 	rows, err := reader.ReadAll()
 	if err != nil {
@@ -113,6 +118,7 @@ func firstHeader(headers map[string]int, names ...string) (int, bool) {
 	return 0, false
 }
 
+// normalizeHeader strips punctuation and spaces so "Card Name" and "card_name" match.
 func normalizeHeader(h string) string {
 	return headerCleaner.ReplaceAllString(strings.ToLower(strings.TrimSpace(h)), "")
 }

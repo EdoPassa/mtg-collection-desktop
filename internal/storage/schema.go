@@ -1,5 +1,7 @@
 package storage
 
+// SQLite schema: cards are keyed by Scryfall oracle_id; collection_items holds owned quantities;
+// deck_cards links decks to cards; lent_cards tracks copies loaned to other players.
 const schemaSQL = `
 PRAGMA foreign_keys = ON;
 

@@ -1,3 +1,4 @@
+// Package collection implements import preview/commit, deck comparison, and lending workflows.
 package collection
 
 import (
@@ -112,6 +113,7 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 	if err != nil {
 		return nil, err
 	}
+	// Available = owned quantity minus copies currently lent out (not yet returned).
 	lent, err := s.store.GetLentSummaryByOracleID(ctx)
 	if err != nil {
 		return nil, err
@@ -127,6 +129,9 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 	return rows, nil
 }
 
+// CompareDeck resolves a pasted decklist against the owned collection.
+// When oracle IDs differ but the normalized name matches exactly one owned copy,
+// a RepairCandidate is suggested so the user can merge stale collection rows.
 func (s *Service) CompareDeck(ctx context.Context, deckText string) (DeckCompareResult, error) {
 	lines, unresolved := importer.ParseText(deckText)
 	wanted := map[string]DeckCompareRow{}
@@ -165,6 +170,8 @@ func (s *Service) CompareDeck(ctx context.Context, deckText string) (DeckCompare
 		if owned, ok := ownedByOracle[row.Card.OracleID]; ok {
 			row.Owned = owned.Quantity
 		}
+		// Fallback: match by normalized name when the Scryfall oracle ID changed
+		// (e.g. after re-importing with updated bulk data).
 		if row.Owned <= 0 {
 			candidates := ownedByName[cards.NormalizeName(row.Card.Name)]
 			var positiveCandidates []storage.NameOwnedCard
@@ -303,6 +310,7 @@ func (s *Service) ExportMissingCSV(writer io.Writer, rows []DeckCompareRow) erro
 
 func (s *Service) preview(ctx context.Context, lines []importer.ImportLine, unresolved []string) (ImportPreview, error) {
 	var validated []ResolvedLine
+	// Avoid duplicate Scryfall lookups when the same card appears on multiple lines.
 	cache := map[string]resolver.Result{}
 	for _, line := range lines {
 		key := "name:" + line.Name

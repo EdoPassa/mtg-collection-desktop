@@ -573,6 +573,7 @@ function DeckPanel({ api, setMessage }: { api: BackendApi; setMessage: (message:
     }
   }
 
+  // Build is allowed only when every card is owned and oracle-ID mismatches are resolved.
   const canBuild = result.rows.length > 0 && result.rows.every((row) => row.missing === 0) && !result.hasUnresolved && deckName.trim() !== "";
   const repairRows = result.repairs.map((repair) => `Repair ${repair.fromOracleId} to ${repair.toCard.name}`);
 

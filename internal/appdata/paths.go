@@ -29,6 +29,8 @@ type MigrationResult struct {
 	ScryfallCopied bool
 }
 
+// ResolvePaths returns database and Scryfall cache locations.
+// Development mode keeps data under ./data; packaged mode uses the OS config directory.
 func ResolvePaths(config Config) Paths {
 	workingDir := config.WorkingDir
 	if workingDir == "" {

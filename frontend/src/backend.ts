@@ -1,6 +1,7 @@
 import * as wailsApi from "../wailsjs/go/app/App";
 import type { cards, collection, storage } from "../wailsjs/go/models";
 
+// Plain strips Go method stubs from Wails-generated model types for use in the frontend.
 type Plain<T> = T extends Array<infer U>
   ? Plain<U>[]
   : T extends object
