@@ -1,4 +1,4 @@
-export type SectionId = "import" | "collection" | "decks" | "deck-compare" | "lending";
+export type SectionId = "import" | "collection" | "decks" | "deck-compare" | "deck-analysis" | "lending";
 
 export type SectionConfig = {
   id: SectionId;
@@ -50,6 +50,13 @@ export const navigation: NavEntry[] = [
         title: "Deck Compare",
         description: "Compare a decklist against your collection and build decks",
         icon: "⚔"
+      },
+      {
+        id: "deck-analysis",
+        label: "Analysis",
+        title: "Deck Analysis",
+        description: "Hypergeometric draw odds for cards and lands in a saved deck",
+        icon: "◎"
       }
     ]
   },

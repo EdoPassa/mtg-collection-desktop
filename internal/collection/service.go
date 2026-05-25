@@ -23,8 +23,8 @@ type Store interface {
 	ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCard, error)
 	DeleteDeck(ctx context.Context, deckID int64) error
 	RenameDeck(ctx context.Context, deckID int64, name string) error
-	SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error
-	AddCardToDeck(ctx context.Context, deckID int64, card cards.CardIdentity, qty int) error
+	SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, board string, qty int) error
+	AddCardToDeck(ctx context.Context, deckID int64, card cards.CardIdentity, board string, qty int) error
 	ReplaceDeckCards(ctx context.Context, deckID int64, rows []cards.DeckCard) error
 	GetOwnedByOracleID(ctx context.Context) (map[string]storage.OwnedCard, error)
 	GetOwnedByNormalizedName(ctx context.Context) (map[string][]storage.NameOwnedCard, error)
@@ -36,8 +36,9 @@ type Store interface {
 }
 
 type Service struct {
-	store    Store
-	resolver resolver.Resolver
+	store        Store
+	resolver     resolver.Resolver
+	oracleIndex  resolver.BulkOracleIndex
 }
 
 type ResolvedLine struct {
@@ -54,6 +55,7 @@ type ImportPreview struct {
 }
 
 type DeckCompareRow struct {
+	Board   string             `json:"board,omitempty"`
 	Card    cards.CardIdentity `json:"card"`
 	Needed  int                `json:"needed"`
 	Owned   int                `json:"owned"`
@@ -78,8 +80,8 @@ type BuildDeckInput struct {
 	Rows          []DeckCompareRow
 }
 
-func New(store Store, cardResolver resolver.Resolver) *Service {
-	return &Service{store: store, resolver: cardResolver}
+func New(store Store, cardResolver resolver.Resolver, oracleIndex resolver.BulkOracleIndex) *Service {
+	return &Service{store: store, resolver: cardResolver, oracleIndex: oracleIndex}
 }
 
 func (s *Service) PreviewTextImport(ctx context.Context, text string) (ImportPreview, error) {
@@ -133,7 +135,7 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 // When oracle IDs differ but the normalized name matches exactly one owned copy,
 // a RepairCandidate is suggested so the user can merge stale collection rows.
 func (s *Service) CompareDeck(ctx context.Context, deckText string) (DeckCompareResult, error) {
-	lines, unresolved := importer.ParseText(deckText)
+	lines, unresolved := importer.ParseDeckText(deckText)
 	wanted := map[string]DeckCompareRow{}
 	for _, line := range lines {
 		result, err := s.resolver.ResolveName(ctx, line.Name)
@@ -142,10 +144,13 @@ func (s *Service) CompareDeck(ctx context.Context, deckText string) (DeckCompare
 			continue
 		}
 		card := cards.CardIdentity{OracleID: result.Card.OracleID, Name: result.Card.Name, ScryfallURI: result.Card.ScryfallURI}
-		row := wanted[card.OracleID]
+		board := cards.NormalizeBoard(line.Board)
+		key := card.OracleID + ":" + board
+		row := wanted[key]
+		row.Board = board
 		row.Card = card
 		row.Needed += line.Quantity
-		wanted[card.OracleID] = row
+		wanted[key] = row
 	}
 	var resolvedCards []cards.CardIdentity
 	for _, row := range wanted {
@@ -231,7 +236,7 @@ func (s *Service) BuildDeckFromCompare(ctx context.Context, input BuildDeckInput
 		if row.Missing > 0 {
 			return 0, errors.New("cannot build deck with missing cards")
 		}
-		deckRows = append(deckRows, cards.DeckCard{Card: row.Card, Quantity: row.Needed})
+		deckRows = append(deckRows, cards.DeckCard{Card: row.Card, Quantity: row.Needed, Board: cards.NormalizeBoard(row.Board)})
 	}
 	deckID := input.ReplaceDeckID
 	var err error
@@ -252,7 +257,16 @@ func (s *Service) ListDecks(ctx context.Context) ([]cards.Deck, error) {
 }
 
 func (s *Service) ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCard, error) {
-	return nonNilDeckCards(s.store.ListDeckCards(ctx, deckID))
+	rows, err := nonNilDeckCards(s.store.ListDeckCards(ctx, deckID))
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if card, ok := s.oracleIndex.LookupOracleID(rows[i].Card.OracleID); ok && card.TypeLine != "" {
+			rows[i].Card.TypeLine = card.TypeLine
+		}
+	}
+	return rows, nil
 }
 
 func (s *Service) DeleteDeck(ctx context.Context, deckID int64) error {
@@ -263,8 +277,8 @@ func (s *Service) RenameDeck(ctx context.Context, deckID int64, name string) err
 	return s.store.RenameDeck(ctx, deckID, name)
 }
 
-func (s *Service) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error {
-	return s.store.SetDeckCardQuantity(ctx, deckID, oracleID, qty)
+func (s *Service) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, board string, qty int) error {
+	return s.store.SetDeckCardQuantity(ctx, deckID, oracleID, cards.NormalizeBoard(board), qty)
 }
 
 func (s *Service) AddCardToDeckByName(ctx context.Context, deckID int64, name string, qty int) error {
@@ -276,7 +290,7 @@ func (s *Service) AddCardToDeckByName(ctx context.Context, deckID int64, name st
 		return err
 	}
 	card := cards.CardIdentity{OracleID: result.Card.OracleID, Name: result.Card.Name, ScryfallURI: result.Card.ScryfallURI}
-	return s.store.AddCardToDeck(ctx, deckID, card, qty)
+	return s.store.AddCardToDeck(ctx, deckID, card, cards.BoardMain, qty)
 }
 
 func (s *Service) LendCard(ctx context.Context, input storage.LendInput) error {

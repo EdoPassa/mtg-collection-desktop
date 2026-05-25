@@ -229,7 +229,7 @@ func TestCompareDeckDoesNotUseAmbiguousNameFallbackAsOwnedQuantity(t *testing.T)
 	}
 	service := New(store, fakeResolver{cards: map[string]scryfall.Card{
 		"Shock": {OracleID: "new-shock", Name: "Shock", ScryfallURI: "https://example.test/new"},
-	}})
+	}}, resolver.BulkOracleIndex{})
 
 	compare, err := service.CompareDeck(t.Context(), "1 Shock")
 	if err != nil {
@@ -262,5 +262,95 @@ func newTestService(t *testing.T) *Service {
 		"Counterspell":   {OracleID: "oracle-counterspell", Name: "Counterspell", ScryfallURI: "https://example.test/counterspell"},
 	}}
 	_ = cards.CardIdentity{}
-	return New(store, res)
+	return New(store, res, resolver.BulkOracleIndex{})
+}
+
+func TestCompareDeckPreservesSideboardRows(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CommitImport(t.Context(), preview.Validated); err != nil {
+		t.Fatal(err)
+	}
+
+	compare, err := service.CompareDeck(t.Context(), "4 Lightning Bolt\n\nSideboard\n2 Counterspell\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(compare.Rows) != 2 {
+		t.Fatalf("compare rows = %#v, want main bolt and side counterspell", compare.Rows)
+	}
+	byBoard := map[string]DeckCompareRow{}
+	for _, row := range compare.Rows {
+		byBoard[row.Board] = row
+	}
+	if byBoard[cards.BoardMain].Needed != 4 || byBoard[cards.BoardSide].Needed != 2 {
+		t.Fatalf("compare by board = %#v", byBoard)
+	}
+	deckID, err := service.BuildDeckFromCompare(t.Context(), BuildDeckInput{Name: "Burn", Rows: compare.Rows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deckCards, err := service.ListDeckCards(t.Context(), deckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mainQty, sideQty int
+	for _, row := range deckCards {
+		if row.Card.Name == "Lightning Bolt" && row.Board == cards.BoardMain {
+			mainQty = row.Quantity
+		}
+		if row.Card.Name == "Counterspell" && row.Board == cards.BoardSide {
+			sideQty = row.Quantity
+		}
+	}
+	if mainQty != 4 || sideQty != 2 {
+		t.Fatalf("deck cards = %#v, want 4 bolt main and 2 counterspell side", deckCards)
+	}
+}
+
+func TestListDeckCardsEnrichesTypeLineFromBulkIndex(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	index, err := resolver.BuildBulkOracleIndex(filepath.Join("..", "..", "testdata", "scryfall", "oracle_cards.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := fakeResolver{cards: map[string]scryfall.Card{
+		"Lightning Bolt": {OracleID: "oracle-lightning-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"},
+		"Mountain":       {OracleID: "oracle-mountain", Name: "Mountain", ScryfallURI: "https://example.test/mountain"},
+	}}
+	service := New(store, res, index)
+
+	deckID, err := store.CreateDeck(t.Context(), "Burn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddCardToDeck(t.Context(), deckID, cards.CardIdentity{OracleID: "oracle-lightning-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"}, cards.BoardMain, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddCardToDeck(t.Context(), deckID, cards.CardIdentity{OracleID: "oracle-mountain", Name: "Mountain", ScryfallURI: "https://example.test/mountain"}, cards.BoardMain, 20); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := service.ListDeckCards(t.Context(), deckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byOracle := map[string]cards.DeckCard{}
+	for _, row := range rows {
+		byOracle[row.Card.OracleID] = row
+	}
+	if byOracle["oracle-lightning-bolt"].Card.TypeLine != "Instant" {
+		t.Fatalf("bolt type_line = %q, want Instant", byOracle["oracle-lightning-bolt"].Card.TypeLine)
+	}
+	if byOracle["oracle-mountain"].Card.TypeLine != "Basic Land — Mountain" {
+		t.Fatalf("mountain type_line = %q, want Basic Land — Mountain", byOracle["oracle-mountain"].Card.TypeLine)
+	}
 }

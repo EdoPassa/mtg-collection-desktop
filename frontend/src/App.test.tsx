@@ -100,7 +100,7 @@ describe("App", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
     await userEvent.click(await screen.findByRole("button", { name: "+" }));
 
-    expect(api.SetDeckCardQuantity).toHaveBeenCalledWith(3, "oracle-bolt", 3);
+    expect(api.SetDeckCardQuantity).toHaveBeenCalledWith(3, "oracle-bolt", "main", 3);
 
     await userEvent.type(screen.getByLabelText("Card name to add"), "Counterspell");
     await userEvent.click(screen.getByRole("button", { name: "Add card" }));

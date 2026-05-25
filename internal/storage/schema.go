@@ -28,8 +28,9 @@ CREATE TABLE IF NOT EXISTS decks (
 CREATE TABLE IF NOT EXISTS deck_cards (
   deck_id INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
   oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE RESTRICT,
+  board TEXT NOT NULL DEFAULT 'main' CHECK (board IN ('main', 'side')),
   quantity INTEGER NOT NULL CHECK (quantity > 0),
-  PRIMARY KEY (deck_id, oracle_id)
+  PRIMARY KEY (deck_id, oracle_id, board)
 );
 
 CREATE INDEX IF NOT EXISTS idx_deck_cards_oracle_id ON deck_cards(oracle_id);
@@ -52,4 +53,20 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
+INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
+`
+
+const migrateV2SQL = `
+CREATE TABLE deck_cards_v2 (
+  deck_id INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+  oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE RESTRICT,
+  board TEXT NOT NULL DEFAULT 'main' CHECK (board IN ('main', 'side')),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  PRIMARY KEY (deck_id, oracle_id, board)
+);
+INSERT INTO deck_cards_v2 (deck_id, oracle_id, board, quantity)
+SELECT deck_id, oracle_id, 'main', quantity FROM deck_cards;
+DROP TABLE deck_cards;
+ALTER TABLE deck_cards_v2 RENAME TO deck_cards;
+CREATE INDEX IF NOT EXISTS idx_deck_cards_oracle_id ON deck_cards(oracle_id);
 `

@@ -96,8 +96,34 @@ func (s *Store) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx, schemaSQL)
-	return err
+	if _, err := s.db.ExecContext(ctx, schemaSQL); err != nil {
+		return err
+	}
+	return s.migrateDeckBoardColumn(ctx)
+}
+
+func (s *Store) migrateDeckBoardColumn(ctx context.Context) error {
+	var hasBoard int
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pragma_table_info('deck_cards') WHERE name = 'board'
+	`).Scan(&hasBoard); err != nil {
+		return err
+	}
+	if hasBoard > 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	if _, err := tx.ExecContext(ctx, migrateV2SQL); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO schema_migrations(version) VALUES (2)`); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) UpsertCards(ctx context.Context, cardRows []cards.CardIdentity) error {
@@ -232,10 +258,11 @@ func (s *Store) ListDecks(ctx context.Context) ([]cards.Deck, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) AddCardToDeck(ctx context.Context, deckID int64, card cards.CardIdentity, qty int) error {
+func (s *Store) AddCardToDeck(ctx context.Context, deckID int64, card cards.CardIdentity, board string, qty int) error {
 	if qty <= 0 {
 		return errors.New("quantity must be > 0")
 	}
+	board = cards.NormalizeBoard(board)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -245,11 +272,11 @@ func (s *Store) AddCardToDeck(ctx context.Context, deckID int64, card cards.Card
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO deck_cards (deck_id, oracle_id, quantity)
-		VALUES (?, ?, ?)
-		ON CONFLICT(deck_id, oracle_id) DO UPDATE SET
+		INSERT INTO deck_cards (deck_id, oracle_id, board, quantity)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(deck_id, oracle_id, board) DO UPDATE SET
 		  quantity = quantity + excluded.quantity
-	`, deckID, card.OracleID, qty); err != nil {
+	`, deckID, card.OracleID, board, qty); err != nil {
 		return errors.New("deck does not exist")
 	}
 	return tx.Commit()
@@ -277,10 +304,11 @@ func (s *Store) ReplaceDeckCards(ctx context.Context, deckID int64, rows []cards
 		if err := upsertCard(ctx, tx, row.Card); err != nil {
 			return err
 		}
+		board := cards.NormalizeBoard(row.Board)
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO deck_cards (deck_id, oracle_id, quantity)
-			VALUES (?, ?, ?)
-		`, deckID, row.Card.OracleID, row.Quantity); err != nil {
+			INSERT INTO deck_cards (deck_id, oracle_id, board, quantity)
+			VALUES (?, ?, ?, ?)
+		`, deckID, row.Card.OracleID, board, row.Quantity); err != nil {
 			return err
 		}
 	}
@@ -289,11 +317,11 @@ func (s *Store) ReplaceDeckCards(ctx context.Context, deckID int64, rows []cards
 
 func (s *Store) ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCard, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT dc.oracle_id, c.name, c.scryfall_uri, dc.quantity
+		SELECT dc.oracle_id, c.name, c.scryfall_uri, dc.quantity, dc.board
 		FROM deck_cards dc
 		JOIN cards c ON c.oracle_id = dc.oracle_id
 		WHERE dc.deck_id = ?
-		ORDER BY c.name COLLATE NOCASE
+		ORDER BY dc.board, c.name COLLATE NOCASE
 	`, deckID)
 	if err != nil {
 		return nil, err
@@ -302,9 +330,10 @@ func (s *Store) ListDeckCards(ctx context.Context, deckID int64) ([]cards.DeckCa
 	var out []cards.DeckCard
 	for rows.Next() {
 		var row cards.DeckCard
-		if err := rows.Scan(&row.Card.OracleID, &row.Card.Name, &row.Card.ScryfallURI, &row.Quantity); err != nil {
+		if err := rows.Scan(&row.Card.OracleID, &row.Card.Name, &row.Card.ScryfallURI, &row.Quantity, &row.Board); err != nil {
 			return nil, err
 		}
+		row.Board = cards.NormalizeBoard(row.Board)
 		out = append(out, row)
 	}
 	return out, rows.Err()
@@ -344,8 +373,9 @@ func (s *Store) RenameDeck(ctx context.Context, deckID int64, name string) error
 	return nil
 }
 
-// SetDeckCardQuantity sets qty to 0 to remove the card from the deck entirely.
-func (s *Store) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, qty int) error {
+// SetDeckCardQuantity sets qty to 0 to remove the card from the deck board entirely.
+func (s *Store) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID string, board string, qty int) error {
+	board = cards.NormalizeBoard(board)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -356,16 +386,16 @@ func (s *Store) SetDeckCardQuantity(ctx context.Context, deckID int64, oracleID 
 		return errors.New("deck does not exist")
 	}
 	if qty <= 0 {
-		if _, err := tx.ExecContext(ctx, "DELETE FROM deck_cards WHERE deck_id = ? AND oracle_id = ?", deckID, oracleID); err != nil {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND board = ?", deckID, oracleID, board); err != nil {
 			return err
 		}
 		return tx.Commit()
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO deck_cards (deck_id, oracle_id, quantity)
-		VALUES (?, ?, ?)
-		ON CONFLICT(deck_id, oracle_id) DO UPDATE SET quantity = excluded.quantity
-	`, deckID, oracleID, qty); err != nil {
+		INSERT INTO deck_cards (deck_id, oracle_id, board, quantity)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(deck_id, oracle_id, board) DO UPDATE SET quantity = excluded.quantity
+	`, deckID, oracleID, board, qty); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -13,8 +13,11 @@ func TestIterBulkCardsIdentityReadsOracleFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[0].Card.OracleID != "oracle-lightning-bolt" || rows[0].ScryfallID == "" {
-		t.Fatalf("bulk rows = %#v, want two fixture rows with IDs", rows)
+	if len(rows) != 3 || rows[0].Card.OracleID != "oracle-lightning-bolt" || rows[0].ScryfallID == "" {
+		t.Fatalf("bulk rows = %#v, want three fixture rows with IDs", rows)
+	}
+	if rows[0].Card.TypeLine != "Instant" {
+		t.Fatalf("bolt type_line = %q, want Instant", rows[0].Card.TypeLine)
 	}
 }
 

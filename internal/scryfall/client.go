@@ -197,6 +197,7 @@ func toCard(payload map[string]any) (Card, bool, error) {
 		OracleID:    stringField(payload, "oracle_id"),
 		Name:        stringField(payload, "name"),
 		ScryfallURI: stringField(payload, "scryfall_uri"),
+		TypeLine:    stringField(payload, "type_line"),
 	}
 	if card.OracleID == "" || card.Name == "" || card.ScryfallURI == "" {
 		return Card{}, false, Error{Message: "Unexpected Scryfall payload: missing card identity"}

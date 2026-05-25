@@ -60,10 +60,10 @@ func TestDeckAndLendingSemantics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.AddCardToDeck(t.Context(), deckID, card, 2); err != nil {
+	if err := store.AddCardToDeck(t.Context(), deckID, card, cards.BoardMain, 2); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.AddCardToDeck(t.Context(), deckID, card, 1); err != nil {
+	if err := store.AddCardToDeck(t.Context(), deckID, card, cards.BoardMain, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,11 +107,11 @@ func TestDeckCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.AddCardToDeck(t.Context(), deckID, card, 4); err != nil {
+	if err := store.AddCardToDeck(t.Context(), deckID, card, cards.BoardMain, 4); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := store.SetDeckCardQuantity(t.Context(), deckID, card.OracleID, 2); err != nil {
+	if err := store.SetDeckCardQuantity(t.Context(), deckID, card.OracleID, cards.BoardMain, 2); err != nil {
 		t.Fatal(err)
 	}
 	deckCards, err := store.ListDeckCards(t.Context(), deckID)
@@ -122,7 +122,7 @@ func TestDeckCRUD(t *testing.T) {
 		t.Fatalf("deck cards after set qty = %#v, want qty 2", deckCards)
 	}
 
-	if err := store.SetDeckCardQuantity(t.Context(), deckID, card.OracleID, 0); err != nil {
+	if err := store.SetDeckCardQuantity(t.Context(), deckID, card.OracleID, cards.BoardMain, 0); err != nil {
 		t.Fatal(err)
 	}
 	deckCards, err = store.ListDeckCards(t.Context(), deckID)

@@ -18,6 +18,7 @@ type ImportLine struct {
 	Quantity   int    `json:"quantity"`
 	Name       string `json:"name"`
 	ScryfallID string `json:"scryfallId,omitempty"`
+	Board      string `json:"board,omitempty"`
 }
 
 var (

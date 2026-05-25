@@ -34,7 +34,7 @@ export type BackendApi = {
   ListDeckCards(deckID: number): Promise<DeckCard[]>;
   DeleteDeck(deckID: number): Promise<void>;
   RenameDeck(deckID: number, name: string): Promise<void>;
-  SetDeckCardQuantity(deckID: number, oracleID: string, qty: number): Promise<void>;
+  SetDeckCardQuantity(deckID: number, oracleID: string, board: string, qty: number): Promise<void>;
   AddCardToDeckByName(deckID: number, name: string, qty: number): Promise<void>;
   LendCard(input: LendInput): Promise<void>;
   ListLentCards(includeReturned: boolean): Promise<LentCard[]>;

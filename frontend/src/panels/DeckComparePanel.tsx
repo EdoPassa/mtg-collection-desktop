@@ -1,8 +1,9 @@
-import React, { useState } from "react";
-import type { DeckCompareResult } from "../backend";
+import React, { useMemo, useState } from "react";
+import type { DeckCompareResult, DeckCompareRow } from "../backend";
 import { EmptyState } from "../components/EmptyState";
 import { ResultList } from "../components/ResultList";
 import { Stat } from "../components/Stat";
+import { boardLabel, isMainboard } from "../lib/deckBoard";
 import type { PanelProps } from "./types";
 
 export function DeckComparePanel({ api, setMessage }: PanelProps) {
@@ -42,12 +43,49 @@ export function DeckComparePanel({ api, setMessage }: PanelProps) {
 
   const canBuild = result.rows.length > 0 && result.rows.every((row) => row.missing === 0) && !result.hasUnresolved && deckName.trim() !== "";
   const repairRows = result.repairs.map((repair) => `Repair ${repair.fromOracleId} to ${repair.toCard.name}`);
+  const { mainboard, sideboard } = useMemo(() => {
+    const mainboard: DeckCompareRow[] = [];
+    const sideboard: DeckCompareRow[] = [];
+    for (const row of result.rows) {
+      if (isMainboard(row.board)) {
+        mainboard.push(row);
+      } else {
+        sideboard.push(row);
+      }
+    }
+    return { mainboard, sideboard };
+  }, [result.rows]);
+
+  function CompareRows({ rows }: { rows: DeckCompareRow[] }) {
+    return (
+      <div className="card-grid">
+        {rows.map((row) => (
+          <article key={`${row.board ?? "main"}-${row.card.oracleId}`} className="card-row">
+            <h3>{row.card.name}</h3>
+            <div className="stat-row">
+              <Stat label="Needed" value={row.needed} />
+              <Stat label="Owned" value={row.owned} />
+              <Stat label="Missing" value={row.missing} tone={row.missing > 0 ? "danger" : "success"} />
+            </div>
+            <span className={`badge ${row.missing === 0 ? "badge--complete" : "badge--missing"}`}>
+              {row.missing === 0 ? "Complete" : `${row.missing} short`}
+            </span>
+          </article>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <section className="panel" aria-label="Deck Compare">
       <label>
         Decklist
-        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={8} placeholder="One card per line…" />
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          rows={8}
+          placeholder={"One card per line…\n\nSideboard\n2 Card Name"}
+        />
       </label>
       <div className="actions compare-toolbar">
         <button type="button" className="primary" onClick={compare}>
@@ -64,21 +102,20 @@ export function DeckComparePanel({ api, setMessage }: PanelProps) {
       {result.rows.length === 0 ? (
         <EmptyState title="No comparison yet" detail="Paste a decklist and run Compare to see owned vs missing." />
       ) : (
-        <div className="card-grid">
-          {result.rows.map((row) => (
-            <article key={row.card.oracleId} className="card-row">
-              <h3>{row.card.name}</h3>
-              <div className="stat-row">
-                <Stat label="Needed" value={row.needed} />
-                <Stat label="Owned" value={row.owned} />
-                <Stat label="Missing" value={row.missing} tone={row.missing > 0 ? "danger" : "success"} />
-              </div>
-              <span className={`badge ${row.missing === 0 ? "badge--complete" : "badge--missing"}`}>
-                {row.missing === 0 ? "Complete" : `${row.missing} short`}
-              </span>
-            </article>
-          ))}
-        </div>
+        <>
+          {mainboard.length > 0 && (
+            <section className="deck-board-section" aria-label="Mainboard comparison">
+              <h3 className="deck-board-heading">{boardLabel("main")}</h3>
+              <CompareRows rows={mainboard} />
+            </section>
+          )}
+          {sideboard.length > 0 && (
+            <section className="deck-board-section" aria-label="Sideboard comparison">
+              <h3 className="deck-board-heading">{boardLabel("side")}</h3>
+              <CompareRows rows={sideboard} />
+            </section>
+          )}
+        </>
       )}
       <ResultList title="Compare warnings" rows={result.unresolved} warn={result.unresolved.length > 0} />
       {repairRows.length > 0 && <ResultList title="Repair candidates" rows={repairRows} />}

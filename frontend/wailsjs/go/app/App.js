@@ -66,6 +66,6 @@ export function ReturnCard(arg1, arg2) {
   return window['go']['app']['App']['ReturnCard'](arg1, arg2);
 }
 
-export function SetDeckCardQuantity(arg1, arg2, arg3) {
-  return window['go']['app']['App']['SetDeckCardQuantity'](arg1, arg2, arg3);
+export function SetDeckCardQuantity(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SetDeckCardQuantity'](arg1, arg2, arg3, arg4);
 }

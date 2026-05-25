@@ -4,6 +4,7 @@ type CardIdentity struct {
 	OracleID    string `json:"oracleId"`
 	Name        string `json:"name"`
 	ScryfallURI string `json:"scryfallUri"`
+	TypeLine    string `json:"typeLine,omitempty"`
 }
 
 type CollectionItem struct {
@@ -22,6 +23,7 @@ type Deck struct {
 type DeckCard struct {
 	Card     CardIdentity `json:"card"`
 	Quantity int          `json:"quantity"`
+	Board    string       `json:"board,omitempty"`
 }
 
 type LentCard struct {

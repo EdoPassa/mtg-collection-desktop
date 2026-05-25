@@ -36,4 +36,4 @@ export function ResolverStatus():Promise<string>;
 
 export function ReturnCard(arg1:number,arg2:string):Promise<void>;
 
-export function SetDeckCardQuantity(arg1:number,arg2:string,arg3:number):Promise<void>;
+export function SetDeckCardQuantity(arg1:number,arg2:string,arg3:string,arg4:number):Promise<void>;

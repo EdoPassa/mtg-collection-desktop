@@ -31,7 +31,7 @@ func TestAppMethodsExposeCollectionWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	app := New(store, fakeResolver{}, "api-only")
+	app := New(store, fakeResolver{}, "api-only", resolver.BulkOracleIndex{})
 
 	preview, err := app.PreviewTextImport("2 Sol Ring")
 	if err != nil {
@@ -61,7 +61,7 @@ func TestAppListCollectionReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	app := New(store, fakeResolver{}, "api-only")
+	app := New(store, fakeResolver{}, "api-only", resolver.BulkOracleIndex{})
 
 	rows, err := app.ListCollection()
 	if err != nil {
@@ -78,7 +78,7 @@ func TestAppListLentCardsReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	app := New(store, fakeResolver{}, "api-only")
+	app := New(store, fakeResolver{}, "api-only", resolver.BulkOracleIndex{})
 
 	rows, err := app.ListLentCards(false)
 	if err != nil {

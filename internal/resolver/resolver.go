@@ -32,6 +32,7 @@ type API interface {
 type BulkOracleIndex struct {
 	byName       map[string]scryfall.Card
 	byScryfallID map[string]scryfall.Card
+	byOracleID   map[string]scryfall.Card
 }
 
 // BulkFirst resolves cards locally first, then calls the Scryfall API on cache miss.
@@ -50,7 +51,11 @@ func BuildBulkOracleIndex(path string) (BulkOracleIndex, error) {
 	if err != nil {
 		return BulkOracleIndex{}, err
 	}
-	index := BulkOracleIndex{byName: map[string]scryfall.Card{}, byScryfallID: map[string]scryfall.Card{}}
+	index := BulkOracleIndex{
+		byName:       map[string]scryfall.Card{},
+		byScryfallID: map[string]scryfall.Card{},
+		byOracleID:   map[string]scryfall.Card{},
+	}
 	for _, row := range rows {
 		nameKey := cards.NormalizeName(row.Card.Name)
 		if nameKey != "" {
@@ -61,6 +66,11 @@ func BuildBulkOracleIndex(path string) (BulkOracleIndex, error) {
 		if idKey := strings.TrimSpace(strings.ToLower(row.ScryfallID)); idKey != "" {
 			if _, exists := index.byScryfallID[idKey]; !exists {
 				index.byScryfallID[idKey] = row.Card
+			}
+		}
+		if oracleKey := strings.TrimSpace(strings.ToLower(row.Card.OracleID)); oracleKey != "" {
+			if _, exists := index.byOracleID[oracleKey]; !exists {
+				index.byOracleID[oracleKey] = row.Card
 			}
 		}
 	}
@@ -134,5 +144,10 @@ func (i BulkOracleIndex) LookupName(name string) (scryfall.Card, bool) {
 
 func (i BulkOracleIndex) LookupScryfallID(scryfallID string) (scryfall.Card, bool) {
 	card, ok := i.byScryfallID[strings.TrimSpace(strings.ToLower(scryfallID))]
+	return card, ok
+}
+
+func (i BulkOracleIndex) LookupOracleID(oracleID string) (scryfall.Card, bool) {
+	card, ok := i.byOracleID[strings.TrimSpace(strings.ToLower(oracleID))]
 	return card, ok
 }

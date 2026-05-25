@@ -26,15 +26,17 @@ func bootstrap() (*appsvc.App, func(), error) {
 	cleanup := func() { _ = store.Close() }
 	api := scryfall.NewClient(scryfall.Options{})
 	var cardResolver resolver.Resolver = resolver.NewAPIOnly(api)
+	var oracleIndex resolver.BulkOracleIndex
 	status := "api-only"
 	bulkPaths, err := scryfall.EnsureOracleBulkDownloaded(context.Background(), scryfall.BulkOptions{
 		Paths: scryfall.BulkCachePaths{RootDir: paths.ScryfallDir},
 	})
 	if err == nil {
 		if index, idxErr := resolver.BuildBulkOracleIndex(bulkPaths.DataPath); idxErr == nil {
+			oracleIndex = index
 			cardResolver = resolver.NewBulkFirst(index, api)
 			status = "bulk-first"
 		}
 	}
-	return appsvc.New(store, cardResolver, status), cleanup, nil
+	return appsvc.New(store, cardResolver, status, oracleIndex), cleanup, nil
 }

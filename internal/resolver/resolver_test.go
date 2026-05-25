@@ -55,3 +55,14 @@ func TestBulkFirstResolverFallsBackToAPI(t *testing.T) {
 		t.Fatalf("result = %#v, want API Sol Ring", result)
 	}
 }
+
+func TestBulkOracleIndexLookupOracleID(t *testing.T) {
+	index, err := BuildBulkOracleIndex(filepath.Join("..", "..", "testdata", "scryfall", "oracle_cards.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, ok := index.LookupOracleID("oracle-mountain")
+	if !ok || card.TypeLine != "Basic Land — Mountain" {
+		t.Fatalf("LookupOracleID = %#v, ok=%v, want mountain land type", card, ok)
+	}
+}

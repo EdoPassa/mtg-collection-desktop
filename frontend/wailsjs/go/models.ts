@@ -4,6 +4,7 @@ export namespace cards {
 	    oracleId: string;
 	    name: string;
 	    scryfallUri: string;
+	    typeLine?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CardIdentity(source);
@@ -14,6 +15,7 @@ export namespace cards {
 	        this.oracleId = source["oracleId"];
 	        this.name = source["name"];
 	        this.scryfallUri = source["scryfallUri"];
+	        this.typeLine = source["typeLine"];
 	    }
 	}
 	export class CollectionItem {
@@ -71,6 +73,7 @@ export namespace cards {
 	export class DeckCard {
 	    card: CardIdentity;
 	    quantity: number;
+	    board?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DeckCard(source);
@@ -80,6 +83,7 @@ export namespace cards {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.card = this.convertValues(source["card"], CardIdentity);
 	        this.quantity = source["quantity"];
+	        this.board = source["board"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -148,6 +152,7 @@ export namespace cards {
 export namespace collection {
 	
 	export class DeckCompareRow {
+	    board?: string;
 	    card: cards.CardIdentity;
 	    needed: number;
 	    owned: number;
@@ -159,6 +164,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.board = source["board"];
 	        this.card = this.convertValues(source["card"], cards.CardIdentity);
 	        this.needed = source["needed"];
 	        this.owned = source["owned"];
@@ -367,6 +373,7 @@ export namespace importer {
 	    quantity: number;
 	    name: string;
 	    scryfallId?: string;
+	    board?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ImportLine(source);
@@ -378,6 +385,7 @@ export namespace importer {
 	        this.quantity = source["quantity"];
 	        this.name = source["name"];
 	        this.scryfallId = source["scryfallId"];
+	        this.board = source["board"];
 	    }
 	}
 

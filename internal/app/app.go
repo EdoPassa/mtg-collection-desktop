@@ -16,8 +16,8 @@ type App struct {
 	resolverStatus string
 }
 
-func New(store collection.Store, cardResolver resolver.Resolver, resolverStatus string) *App {
-	return &App{service: collection.New(store, cardResolver), resolverStatus: resolverStatus}
+func New(store collection.Store, cardResolver resolver.Resolver, resolverStatus string, oracleIndex resolver.BulkOracleIndex) *App {
+	return &App{service: collection.New(store, cardResolver, oracleIndex), resolverStatus: resolverStatus}
 }
 
 func (a *App) ResolverStatus() string {
@@ -68,8 +68,8 @@ func (a *App) RenameDeck(deckID int64, name string) error {
 	return a.service.RenameDeck(context.Background(), deckID, name)
 }
 
-func (a *App) SetDeckCardQuantity(deckID int64, oracleID string, qty int) error {
-	return a.service.SetDeckCardQuantity(context.Background(), deckID, oracleID, qty)
+func (a *App) SetDeckCardQuantity(deckID int64, oracleID string, board string, qty int) error {
+	return a.service.SetDeckCardQuantity(context.Background(), deckID, oracleID, board, qty)
 }
 
 func (a *App) AddCardToDeckByName(deckID int64, name string, qty int) error {

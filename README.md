@@ -10,6 +10,7 @@ Built with **Go**, **Wails v2**, **React**, and **SQLite**. Card names are resol
 - **Collection** — Search owned cards; view owned, lent, and available quantities; see whether a card appears in a saved deck.
 - **Decks (Library)** — Browse saved decks, rename or delete them, and edit card quantities.
 - **Decks (Compare)** — Compare a pasted decklist against your collection, repair oracle ID mismatches, and build a named deck when you have every card.
+- **Decks (Analysis)** — Hypergeometric draw odds for a saved deck: specific cards, land counts from Scryfall `type_line` (bulk cache), and a generic calculator with opening-hand presets.
 - **Lending** — Record loans by choosing a card from your collection and a borrower; mark active loans as returned.
 
 Resolution uses a local Scryfall oracle bulk index first, then exact and fuzzy API lookups. If bulk bootstrap fails, the app still starts in API-only mode (shown in the sidebar status).

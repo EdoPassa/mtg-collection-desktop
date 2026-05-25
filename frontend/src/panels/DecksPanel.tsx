@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import type { Deck, DeckCard } from "../backend";
 import { EmptyState } from "../components/EmptyState";
 import { Stat } from "../components/Stat";
+import { boardLabel, isMainboard, normalizeBoard, partitionDeckCards, totalQuantity } from "../lib/deckBoard";
 import type { PanelProps } from "./types";
 
 export function DecksPanel({ api, setMessage }: PanelProps) {
@@ -66,7 +67,9 @@ export function DecksPanel({ api, setMessage }: PanelProps) {
     [cards, cardQuery]
   );
 
-  const totalCards = useMemo(() => cards.reduce((sum, row) => sum + row.quantity, 0), [cards]);
+  const { mainboard, sideboard } = useMemo(() => partitionDeckCards(filteredCards), [filteredCards]);
+  const mainTotal = useMemo(() => totalQuantity(cards.filter((row) => isMainboard(row.board))), [cards]);
+  const sideTotal = useMemo(() => totalQuantity(cards.filter((row) => !isMainboard(row.board))), [cards]);
 
   async function selectDeck(deck: Deck) {
     setSelectedId(deck.id);
@@ -104,12 +107,12 @@ export function DecksPanel({ api, setMessage }: PanelProps) {
     }
   }
 
-  async function setQuantity(oracleID: string, qty: number) {
+  async function setQuantity(oracleID: string, board: string, qty: number) {
     if (selectedId === null) {
       return;
     }
     try {
-      await api.SetDeckCardQuantity(selectedId, oracleID, qty);
+      await api.SetDeckCardQuantity(selectedId, oracleID, normalizeBoard(board), qty);
       await loadCards(selectedId);
       setMessage(qty <= 0 ? "Removed card from deck." : "Updated card quantity.");
     } catch (error) {
@@ -183,7 +186,9 @@ export function DecksPanel({ api, setMessage }: PanelProps) {
                 <button type="button" className="ghost" onClick={() => void deleteDeck()}>
                   Delete deck
                 </button>
-                <span className="card-meta">{totalCards} card(s)</span>
+                <span className="card-meta">
+                  {mainTotal} main{sideTotal > 0 ? ` · ${sideTotal} side` : ""}
+                </span>
               </div>
               <div className="toolbar">
                 <input
@@ -215,44 +220,76 @@ export function DecksPanel({ api, setMessage }: PanelProps) {
                   detail={cards.length === 0 ? "Add cards by name or build this deck from Deck Compare." : "Try a different search term."}
                 />
               ) : (
-                <div className="card-grid">
-                  {filteredCards.map((row) => (
-                    <article key={row.card.oracleId} className="card-row">
-                      <h3>{row.card.name}</h3>
-                      <div className="stat-row">
-                        <Stat label="Qty" value={row.quantity} />
-                      </div>
-                      <div className="deck-card-actions">
-                        <button type="button" className="ghost" onClick={() => void setQuantity(row.card.oracleId, row.quantity - 1)}>
-                          −
-                        </button>
-                        <input
-                          aria-label={`Quantity for ${row.card.name}`}
-                          type="number"
-                          min={0}
-                          defaultValue={row.quantity}
-                          key={`${row.card.oracleId}-${row.quantity}`}
-                          onBlur={(event) => {
-                            const qty = Number(event.target.value);
-                            if (!Number.isNaN(qty) && qty !== row.quantity) {
-                              void setQuantity(row.card.oracleId, qty);
-                            }
-                          }}
-                        />
-                        <button type="button" className="ghost" onClick={() => void setQuantity(row.card.oracleId, row.quantity + 1)}>
-                          +
-                        </button>
-                        <button type="button" className="ghost" onClick={() => void setQuantity(row.card.oracleId, 0)}>
-                          Remove
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                <>
+                  {mainboard.length > 0 && (
+                    <DeckBoardGrid
+                      title={boardLabel("main")}
+                      rows={mainboard}
+                      onSetQuantity={(oracleID, board, qty) => void setQuantity(oracleID, board, qty)}
+                    />
+                  )}
+                  {sideboard.length > 0 && (
+                    <DeckBoardGrid
+                      title={boardLabel("side")}
+                      rows={sideboard}
+                      onSetQuantity={(oracleID, board, qty) => void setQuantity(oracleID, board, qty)}
+                    />
+                  )}
+                </>
               )}
             </>
           )}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function DeckBoardGrid({
+  title,
+  rows,
+  onSetQuantity
+}: {
+  title: string;
+  rows: DeckCard[];
+  onSetQuantity: (oracleID: string, board: string, qty: number) => void;
+}) {
+  return (
+    <section className="deck-board-section" aria-label={title}>
+      <h3 className="deck-board-heading">{title}</h3>
+      <div className="card-grid">
+        {rows.map((row) => (
+          <article key={`${normalizeBoard(row.board)}-${row.card.oracleId}`} className="card-row">
+            <h3>{row.card.name}</h3>
+            <div className="stat-row">
+              <Stat label="Qty" value={row.quantity} />
+            </div>
+            <div className="deck-card-actions">
+              <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", row.quantity - 1)}>
+                −
+              </button>
+              <input
+                aria-label={`Quantity for ${row.card.name}`}
+                type="number"
+                min={0}
+                defaultValue={row.quantity}
+                key={`${normalizeBoard(row.board)}-${row.card.oracleId}-${row.quantity}`}
+                onBlur={(event) => {
+                  const qty = Number(event.target.value);
+                  if (!Number.isNaN(qty) && qty !== row.quantity) {
+                    onSetQuantity(row.card.oracleId, row.board ?? "main", qty);
+                  }
+                }}
+              />
+              <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", row.quantity + 1)}>
+                +
+              </button>
+              <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", 0)}>
+                Remove
+              </button>
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );
