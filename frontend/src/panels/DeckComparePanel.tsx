@@ -4,6 +4,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ResultList } from "../components/ResultList";
 import { Stat } from "../components/Stat";
 import { boardLabel, isMainboard } from "../lib/deckBoard";
+import { downloadTextFile } from "../lib/downloadText";
 import type { PanelProps } from "./types";
 
 export function DeckComparePanel({ api, setMessage }: PanelProps) {
@@ -42,6 +43,21 @@ export function DeckComparePanel({ api, setMessage }: PanelProps) {
   }
 
   const canBuild = result.rows.length > 0 && result.rows.every((row) => row.missing === 0) && !result.hasUnresolved && deckName.trim() !== "";
+  const hasMissing = result.rows.some((row) => row.missing > 0);
+
+  async function exportMissing() {
+    try {
+      const content = await api.FormatMissingDecklist(result.rows);
+      if (!content.trim()) {
+        setMessage("No missing cards to export.");
+        return;
+      }
+      downloadTextFile("missing-cards.txt", content);
+      setMessage("Exported missing cards.");
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
   const repairRows = result.repairs.map((repair) => `Repair ${repair.fromOracleId} to ${repair.toCard.name}`);
   const { mainboard, sideboard } = useMemo(() => {
     const mainboard: DeckCompareRow[] = [];
@@ -97,6 +113,9 @@ export function DeckComparePanel({ api, setMessage }: PanelProps) {
         </button>
         <button type="button" className="ghost" onClick={repair} disabled={result.repairs.length === 0}>
           Repair Mismatches
+        </button>
+        <button type="button" className="ghost" onClick={exportMissing} disabled={!hasMissing}>
+          Export missing (.txt)
         </button>
       </div>
       {result.rows.length === 0 ? (

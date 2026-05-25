@@ -22,6 +22,10 @@ export function DeleteDeck(arg1) {
   return window['go']['app']['App']['DeleteDeck'](arg1);
 }
 
+export function FormatMissingDecklist(arg1) {
+  return window['go']['app']['App']['FormatMissingDecklist'](arg1);
+}
+
 export function LendCard(arg1) {
   return window['go']['app']['App']['LendCard'](arg1);
 }

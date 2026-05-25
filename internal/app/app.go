@@ -87,3 +87,7 @@ func (a *App) ReturnCard(lentID int64, returnDate string) error {
 func (a *App) ListLentCards(includeReturned bool) ([]cards.LentCard, error) {
 	return a.service.ListLentCards(context.Background(), includeReturned)
 }
+
+func (a *App) FormatMissingDecklist(rows []collection.DeckCompareRow) string {
+	return collection.FormatMissingDecklist(rows)
+}

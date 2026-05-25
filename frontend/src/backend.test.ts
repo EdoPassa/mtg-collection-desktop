@@ -19,7 +19,8 @@ function fakeBindings(): WailsBindings {
     LendCard: vi.fn().mockResolvedValue(undefined),
     ListLentCards: vi.fn().mockResolvedValue([]),
     ReturnCard: vi.fn().mockResolvedValue(undefined),
-    RepairCompareMismatches: vi.fn().mockResolvedValue(undefined)
+    RepairCompareMismatches: vi.fn().mockResolvedValue(undefined),
+    FormatMissingDecklist: vi.fn().mockResolvedValue("")
   };
 }
 

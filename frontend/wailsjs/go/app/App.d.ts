@@ -14,6 +14,8 @@ export function CompareDeck(arg1:string):Promise<collection.DeckCompareResult>;
 
 export function DeleteDeck(arg1:number):Promise<void>;
 
+export function FormatMissingDecklist(arg1:Array<collection.DeckCompareRow>):Promise<string>;
+
 export function LendCard(arg1:storage.LendInput):Promise<void>;
 
 export function ListCollection():Promise<Array<cards.CollectionItem>>;

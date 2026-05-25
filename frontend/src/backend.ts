@@ -40,6 +40,7 @@ export type BackendApi = {
   ListLentCards(includeReturned: boolean): Promise<LentCard[]>;
   ReturnCard(id: number, returnDate: string): Promise<void>;
   RepairCompareMismatches(repairs: RepairCandidate[]): Promise<void>;
+  FormatMissingDecklist(rows: DeckCompareRow[]): Promise<string>;
 };
 
 export function createBackendApi(bindings: WailsBindings = wailsApi): BackendApi {
@@ -60,6 +61,7 @@ export function createBackendApi(bindings: WailsBindings = wailsApi): BackendApi
     LendCard: (input) => bindings.LendCard(input as storage.LendInput),
     ListLentCards: (includeReturned) => bindings.ListLentCards(includeReturned) as Promise<LentCard[]>,
     ReturnCard: bindings.ReturnCard,
-    RepairCompareMismatches: (repairs) => bindings.RepairCompareMismatches(repairs as collection.RepairCandidate[])
+    RepairCompareMismatches: (repairs) => bindings.RepairCompareMismatches(repairs as collection.RepairCandidate[]),
+    FormatMissingDecklist: (rows) => bindings.FormatMissingDecklist(rows as collection.DeckCompareRow[])
   };
 }
