@@ -157,6 +157,21 @@ li + li {
   gap: 0.35rem;
 }
 
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.nav-group-label {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin: 0.5rem 0.85rem 0.15rem;
+  text-transform: uppercase;
+}
+
 .tab-btn {
   align-items: center;
   background: transparent;

@@ -54,7 +54,7 @@ describe("App", () => {
     ]);
 
     render(<App api={api} />);
-    await userEvent.click(screen.getByRole("button", { name: "Decks" }));
+    await userEvent.click(screen.getByRole("button", { name: "Library" }));
 
     expect(await screen.findByRole("heading", { name: "Decks" })).toBeInTheDocument();
     expect(screen.getByText("Burn")).toBeInTheDocument();
@@ -71,7 +71,7 @@ describe("App", () => {
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
 
     render(<App api={api} />);
-    await userEvent.click(screen.getByRole("button", { name: "Decks" }));
+    await userEvent.click(screen.getByRole("button", { name: "Library" }));
     await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
 
     const nameInput = screen.getByLabelText("Deck name");
@@ -96,7 +96,7 @@ describe("App", () => {
     ]);
 
     render(<App api={api} />);
-    await userEvent.click(screen.getByRole("button", { name: "Decks" }));
+    await userEvent.click(screen.getByRole("button", { name: "Library" }));
     await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
     await userEvent.click(await screen.findByRole("button", { name: "+" }));
 
@@ -222,8 +222,8 @@ describe("App", () => {
       });
 
     render(<App api={api} />);
-    await userEvent.click(screen.getByRole("button", { name: "Decks / Compare" }));
     await userEvent.click(screen.getByRole("button", { name: "Compare" }));
+    await userEvent.click(screen.getByRole("button", { name: "Run compare" }));
 
     expect(await screen.findByText("Repair old-shock to Shock")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Repair Mismatches" }));

@@ -8,8 +8,9 @@ Built with **Go**, **Wails v2**, **React**, and **SQLite**. Card names are resol
 
 - **Import** — Preview and commit card lists from plain text or CSV; unresolved rows are reported before commit.
 - **Collection** — Search owned cards; view owned, lent, and available quantities; see whether a card appears in a saved deck.
-- **Decks / Compare** — Compare a pasted decklist against your collection, repair oracle ID mismatches, and build a named deck when you have every card.
-- **Lending** — Record cards lent by oracle ID and borrower; mark active loans as returned.
+- **Decks (Library)** — Browse saved decks, rename or delete them, and edit card quantities.
+- **Decks (Compare)** — Compare a pasted decklist against your collection, repair oracle ID mismatches, and build a named deck when you have every card.
+- **Lending** — Record loans by choosing a card from your collection and a borrower; mark active loans as returned.
 
 Resolution uses a local Scryfall oracle bulk index first, then exact and fuzzy API lookups. If bulk bootstrap fails, the app still starts in API-only mode (shown in the sidebar status).
 
