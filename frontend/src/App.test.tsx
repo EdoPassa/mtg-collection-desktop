@@ -124,7 +124,7 @@ describe("App", () => {
     render(<App api={api} />);
     await userEvent.click(screen.getByRole("button", { name: "Collection" }));
 
-    expect(await screen.findByText("Lightning Bolt")).toBeInTheDocument();
+    expect(await screen.findByText("Lightning Bolt", { selector: "strong" })).toBeInTheDocument();
     expect(screen.getByText("Available: 3")).toBeInTheDocument();
   });
 

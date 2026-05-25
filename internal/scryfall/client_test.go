@@ -86,3 +86,69 @@ func writeCard(t *testing.T, w http.ResponseWriter, oracleID string, name string
 	}
 	time.Sleep(0)
 }
+
+func TestToCardExtractsCostColorAndImageURIs(t *testing.T) {
+	payload := map[string]any{
+		"oracle_id":      "oracle-bolt",
+		"name":           "Lightning Bolt",
+		"scryfall_uri":   "https://scryfall.test/card",
+		"type_line":      "Instant",
+		"mana_cost":      "{R}",
+		"color_identity": []any{"R"},
+		"image_uris": map[string]any{
+			"small":  "https://cards.scryfall.test/small/bolt.jpg",
+			"normal": "https://cards.scryfall.test/normal/bolt.jpg",
+		},
+	}
+	card, ok, err := toCard(payload)
+	if err != nil || !ok {
+		t.Fatalf("toCard ok=%v err=%v", ok, err)
+	}
+	if card.ManaCost != "{R}" {
+		t.Fatalf("mana_cost = %q, want {R}", card.ManaCost)
+	}
+	if len(card.ColorIdentity) != 1 || card.ColorIdentity[0] != "R" {
+		t.Fatalf("color_identity = %#v, want [R]", card.ColorIdentity)
+	}
+	if card.ImageSmall == "" || card.ImageNormal == "" {
+		t.Fatalf("image URIs missing: %#v", card)
+	}
+}
+
+// Double-faced cards (DFCs) store images on each card_face instead of the top level.
+// We fall back to the first face so the UI can still render a thumbnail.
+func TestToCardFallsBackToCardFaceImagesForDFCs(t *testing.T) {
+	payload := map[string]any{
+		"oracle_id":    "oracle-delver",
+		"name":         "Delver of Secrets // Insectile Aberration",
+		"scryfall_uri": "https://scryfall.test/delver",
+		"card_faces": []any{
+			map[string]any{
+				"name":      "Delver of Secrets",
+				"mana_cost": "{U}",
+				"image_uris": map[string]any{
+					"small":  "https://cards.scryfall.test/small/delver.jpg",
+					"normal": "https://cards.scryfall.test/normal/delver.jpg",
+				},
+			},
+			map[string]any{
+				"name":      "Insectile Aberration",
+				"mana_cost": "",
+				"image_uris": map[string]any{
+					"small":  "https://cards.scryfall.test/small/aberration.jpg",
+					"normal": "https://cards.scryfall.test/normal/aberration.jpg",
+				},
+			},
+		},
+	}
+	card, ok, err := toCard(payload)
+	if err != nil || !ok {
+		t.Fatalf("toCard ok=%v err=%v", ok, err)
+	}
+	if card.ImageSmall == "" || card.ImageNormal == "" {
+		t.Fatalf("DFC images not pulled from card_faces: %#v", card)
+	}
+	if card.ManaCost != "{U}" {
+		t.Fatalf("DFC mana_cost = %q, want {U} from first face", card.ManaCost)
+	}
+}

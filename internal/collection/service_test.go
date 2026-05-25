@@ -354,3 +354,72 @@ func TestListDeckCardsEnrichesTypeLineFromBulkIndex(t *testing.T) {
 		t.Fatalf("mountain type_line = %q, want Basic Land — Mountain", byOracle["oracle-mountain"].Card.TypeLine)
 	}
 }
+
+// The Collection view leans on bulk-indexed image URIs, mana cost, and color identity
+// to render the gallery toggle and color filter. Persisted rows only carry oracle ID,
+// name, and scryfall URI, so enrichment has to happen at read time.
+func TestListCollectionEnrichesImagesAndColorFromBulkIndex(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	index, err := resolver.BuildBulkOracleIndex(filepath.Join("..", "..", "testdata", "scryfall", "oracle_cards.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{
+		{OracleID: "oracle-lightning-bolt", Name: "Lightning Bolt", ScryfallURI: "https://scryfall.test/bolt"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollectionBatch(t.Context(), []storage.QuantityChange{
+		{OracleID: "oracle-lightning-bolt", Quantity: 4},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	service := New(store, fakeResolver{}, index)
+
+	rows, err := service.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %#v, want one row", rows)
+	}
+	got := rows[0].Card
+	if got.TypeLine != "Instant" || got.ManaCost != "{R}" {
+		t.Fatalf("enriched card = %#v, want type Instant cost {R}", got)
+	}
+	if len(got.ColorIdentity) != 1 || got.ColorIdentity[0] != "R" {
+		t.Fatalf("color_identity = %#v, want [R]", got.ColorIdentity)
+	}
+	if got.ImageSmall == "" || got.ImageNormal == "" {
+		t.Fatalf("image URIs not enriched: %#v", got)
+	}
+}
+
+// API-only mode (no bulk index) must still return collection rows. The new metadata
+// fields are simply left empty and the frontend degrades gracefully.
+func TestListCollectionWithoutBulkIndexLeavesEnrichmentFieldsEmpty(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CommitImport(t.Context(), preview.Validated); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := service.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %#v, want one row", rows)
+	}
+	got := rows[0].Card
+	if got.ManaCost != "" || got.ImageSmall != "" || got.ImageNormal != "" || len(got.ColorIdentity) != 0 {
+		t.Fatalf("API-only enrichment leaked: %#v", got)
+	}
+}

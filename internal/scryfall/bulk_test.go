@@ -16,8 +16,18 @@ func TestIterBulkCardsIdentityReadsOracleFixture(t *testing.T) {
 	if len(rows) != 3 || rows[0].Card.OracleID != "oracle-lightning-bolt" || rows[0].ScryfallID == "" {
 		t.Fatalf("bulk rows = %#v, want three fixture rows with IDs", rows)
 	}
-	if rows[0].Card.TypeLine != "Instant" {
-		t.Fatalf("bolt type_line = %q, want Instant", rows[0].Card.TypeLine)
+	bolt := rows[0].Card
+	if bolt.TypeLine != "Instant" {
+		t.Fatalf("bolt type_line = %q, want Instant", bolt.TypeLine)
+	}
+	if bolt.ManaCost != "{R}" {
+		t.Fatalf("bolt mana_cost = %q, want {R}", bolt.ManaCost)
+	}
+	if len(bolt.ColorIdentity) != 1 || bolt.ColorIdentity[0] != "R" {
+		t.Fatalf("bolt color_identity = %#v, want [R]", bolt.ColorIdentity)
+	}
+	if bolt.ImageSmall == "" || bolt.ImageNormal == "" {
+		t.Fatalf("bolt image URIs missing: %#v", bolt)
 	}
 }
 

@@ -193,11 +193,16 @@ func (c *Client) throttle(ctx context.Context) error {
 }
 
 func toCard(payload map[string]any) (Card, bool, error) {
+	small, normal := extractImageURIs(payload)
 	card := Card{
-		OracleID:    stringField(payload, "oracle_id"),
-		Name:        stringField(payload, "name"),
-		ScryfallURI: stringField(payload, "scryfall_uri"),
-		TypeLine:    stringField(payload, "type_line"),
+		OracleID:      stringField(payload, "oracle_id"),
+		Name:          stringField(payload, "name"),
+		ScryfallURI:   stringField(payload, "scryfall_uri"),
+		TypeLine:      stringField(payload, "type_line"),
+		ManaCost:      extractManaCost(payload),
+		ColorIdentity: stringSliceField(payload, "color_identity"),
+		ImageSmall:    small,
+		ImageNormal:   normal,
 	}
 	if card.OracleID == "" || card.Name == "" || card.ScryfallURI == "" {
 		return Card{}, false, Error{Message: "Unexpected Scryfall payload: missing card identity"}
@@ -208,6 +213,71 @@ func toCard(payload map[string]any) (Card, bool, error) {
 func stringField(payload map[string]any, key string) string {
 	value, _ := payload[key].(string)
 	return value
+}
+
+func stringSliceField(payload map[string]any, key string) []string {
+	raw, ok := payload[key].([]any)
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok && s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// extractManaCost reads the top-level mana_cost when present, otherwise concatenates
+// the mana_cost of each card_face for split/adventure/MDFC cards.
+func extractManaCost(payload map[string]any) string {
+	if cost := stringField(payload, "mana_cost"); cost != "" {
+		return cost
+	}
+	faces, ok := payload["card_faces"].([]any)
+	if !ok {
+		return ""
+	}
+	var parts []string
+	for _, raw := range faces {
+		face, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if cost := stringField(face, "mana_cost"); cost != "" {
+			parts = append(parts, cost)
+		}
+	}
+	return strings.Join(parts, " // ")
+}
+
+// extractImageURIs returns the (small, normal) image URLs from the top-level image_uris,
+// falling back to the first card_face for double-faced cards that lack a top-level image.
+func extractImageURIs(payload map[string]any) (string, string) {
+	if small, normal := imageURIsFrom(payload); small != "" || normal != "" {
+		return small, normal
+	}
+	faces, ok := payload["card_faces"].([]any)
+	if !ok || len(faces) == 0 {
+		return "", ""
+	}
+	face, ok := faces[0].(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	return imageURIsFrom(face)
+}
+
+func imageURIsFrom(payload map[string]any) (string, string) {
+	uris, ok := payload["image_uris"].(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	return stringField(uris, "small"), stringField(uris, "normal")
 }
 
 func retryAfter(header string) time.Duration {

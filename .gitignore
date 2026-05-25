@@ -36,3 +36,6 @@ frontend/package.json.md5
 *.sqlite3
 *.db
 data/
+
+# Mockups
+docs/ui-redesign-mockups.html

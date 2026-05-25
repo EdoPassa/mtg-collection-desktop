@@ -4,6 +4,12 @@
     "oracle_id": "oracle-lightning-bolt",
     "name": "Lightning Bolt",
     "type_line": "Instant",
+    "mana_cost": "{R}",
+    "color_identity": ["R"],
+    "image_uris": {
+      "small": "https://cards.scryfall.test/small/lightning-bolt.jpg",
+      "normal": "https://cards.scryfall.test/normal/lightning-bolt.jpg"
+    },
     "scryfall_uri": "https://scryfall.com/card/test/1/lightning-bolt"
   },
   {
@@ -11,6 +17,12 @@
     "oracle_id": "oracle-counterspell",
     "name": "Counterspell",
     "type_line": "Instant",
+    "mana_cost": "{U}{U}",
+    "color_identity": ["U"],
+    "image_uris": {
+      "small": "https://cards.scryfall.test/small/counterspell.jpg",
+      "normal": "https://cards.scryfall.test/normal/counterspell.jpg"
+    },
     "scryfall_uri": "https://scryfall.com/card/test/2/counterspell"
   },
   {
@@ -18,6 +30,11 @@
     "oracle_id": "oracle-mountain",
     "name": "Mountain",
     "type_line": "Basic Land — Mountain",
+    "color_identity": [],
+    "image_uris": {
+      "small": "https://cards.scryfall.test/small/mountain.jpg",
+      "normal": "https://cards.scryfall.test/normal/mountain.jpg"
+    },
     "scryfall_uri": "https://scryfall.com/card/test/3/mountain"
   }
 ]

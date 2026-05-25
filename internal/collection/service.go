@@ -127,8 +127,34 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 		if rows[i].Available < 0 {
 			rows[i].Available = 0
 		}
+		s.enrichCardFromBulk(&rows[i].Card)
 	}
 	return rows, nil
+}
+
+// enrichCardFromBulk fills metadata fields (type line, mana cost, color identity, image URIs)
+// from the local Scryfall oracle bulk index, leaving values empty when the index is unavailable
+// or the card is not present (API-only mode degrades gracefully in the UI).
+func (s *Service) enrichCardFromBulk(card *cards.CardIdentity) {
+	bulk, ok := s.oracleIndex.LookupOracleID(card.OracleID)
+	if !ok {
+		return
+	}
+	if card.TypeLine == "" {
+		card.TypeLine = bulk.TypeLine
+	}
+	if card.ManaCost == "" {
+		card.ManaCost = bulk.ManaCost
+	}
+	if len(card.ColorIdentity) == 0 {
+		card.ColorIdentity = bulk.ColorIdentity
+	}
+	if card.ImageSmall == "" {
+		card.ImageSmall = bulk.ImageSmall
+	}
+	if card.ImageNormal == "" {
+		card.ImageNormal = bulk.ImageNormal
+	}
 }
 
 // CompareDeck resolves a pasted decklist against the owned collection.
@@ -262,9 +288,7 @@ func (s *Service) ListDeckCards(ctx context.Context, deckID int64) ([]cards.Deck
 		return nil, err
 	}
 	for i := range rows {
-		if card, ok := s.oracleIndex.LookupOracleID(rows[i].Card.OracleID); ok && card.TypeLine != "" {
-			rows[i].Card.TypeLine = card.TypeLine
-		}
+		s.enrichCardFromBulk(&rows[i].Card)
 	}
 	return rows, nil
 }
@@ -302,7 +326,14 @@ func (s *Service) ReturnCard(ctx context.Context, lentID int64, returnDate strin
 }
 
 func (s *Service) ListLentCards(ctx context.Context, includeReturned bool) ([]cards.LentCard, error) {
-	return s.store.ListLentCards(ctx, includeReturned)
+	rows, err := s.store.ListLentCards(ctx, includeReturned)
+	if err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		s.enrichCardFromBulk(&rows[i].Card)
+	}
+	return rows, nil
 }
 
 func (s *Service) ExportMissingCSV(writer io.Writer, rows []DeckCompareRow) error {

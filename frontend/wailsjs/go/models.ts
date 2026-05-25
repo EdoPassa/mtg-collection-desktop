@@ -5,6 +5,10 @@ export namespace cards {
 	    name: string;
 	    scryfallUri: string;
 	    typeLine?: string;
+	    manaCost?: string;
+	    colorIdentity?: string[];
+	    imageSmall?: string;
+	    imageNormal?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CardIdentity(source);
@@ -16,6 +20,10 @@ export namespace cards {
 	        this.name = source["name"];
 	        this.scryfallUri = source["scryfallUri"];
 	        this.typeLine = source["typeLine"];
+	        this.manaCost = source["manaCost"];
+	        this.colorIdentity = source["colorIdentity"];
+	        this.imageSmall = source["imageSmall"];
+	        this.imageNormal = source["imageNormal"];
 	    }
 	}
 	export class CollectionItem {
