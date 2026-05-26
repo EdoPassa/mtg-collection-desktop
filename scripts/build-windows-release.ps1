@@ -50,25 +50,9 @@ if (-not (Test-Path $appBinary)) {
     throw "Expected binary at $appBinary"
 }
 
-if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
-    throw "NSIS makensis is required for the installer. Install: winget install NSIS.NSIS"
-}
-
-$installerDir = Join-Path $repoRoot "build\windows\installer"
-Push-Location $installerDir
-try {
-    makensis "-DARG_WAILS_AMD64_BINARY=..\..\bin\mtg-collection.exe" project.nsi
-    if ($LASTEXITCODE -ne 0) {
-        throw "makensis failed (exit $LASTEXITCODE)"
-    }
-} finally {
-    Pop-Location
-}
+& (Join-Path $PSScriptRoot "build-nsis-installer.ps1")
 
 $installer = Get-ChildItem (Join-Path $repoRoot "build\bin") -Filter "*-installer.exe" | Select-Object -First 1
-if (-not $installer) {
-    throw "Installer not found in build\bin"
-}
 
 Write-Host "Release artifacts:"
 Write-Host "  $appBinary"

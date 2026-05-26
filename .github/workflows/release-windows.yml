@@ -54,19 +54,7 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Install NSIS
-        shell: pwsh
-        run: |
-          choco install nsis -y --no-progress
-          $candidates = @(
-            "${env:ProgramFiles(x86)}\NSIS",
-            "$env:ProgramFiles\NSIS"
-          )
-          $nsisDir = $candidates | Where-Object { Test-Path (Join-Path $_ "makensis.exe") } | Select-Object -First 1
-          if (-not $nsisDir) {
-            throw "makensis.exe not found after NSIS install. Checked: $($candidates -join ', ')"
-          }
-          Write-Host "NSIS directory: $nsisDir"
-          $nsisDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        uses: negrutiu/nsis-install@v2
 
       - name: Inject version metadata
         shell: pwsh
@@ -86,13 +74,7 @@ jobs:
 
       - name: Build NSIS installer
         shell: pwsh
-        run: |
-          Push-Location build/windows/installer
-          makensis "-DARG_WAILS_AMD64_BINARY=..\..\bin\mtg-collection.exe" project.nsi
-          if ($LASTEXITCODE -ne 0) {
-            throw "makensis failed (exit $LASTEXITCODE)"
-          }
-          Pop-Location
+        run: ./scripts/build-nsis-installer.ps1
 
       - name: Generate checksums
         shell: pwsh
