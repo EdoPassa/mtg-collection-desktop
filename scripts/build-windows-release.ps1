@@ -15,12 +15,12 @@ if ($Version) {
     & (Join-Path $PSScriptRoot "inject-version.ps1") -Version $Version
 }
 
-$ldflags = ""
+$buildVersion = ""
 if ($Version) {
-    if ($Version -match '^v') {
-        $Version = $Version.Substring(1)
+    $buildVersion = $Version
+    if ($buildVersion -match '^v') {
+        $buildVersion = $buildVersion.Substring(1)
     }
-    $ldflags = "-ldflags `"-X mtgcollection/internal/version.Version=$Version`""
 }
 
 if (-not $SkipTests) {
@@ -36,10 +36,13 @@ if (-not $SkipTests) {
 }
 
 Write-Host "Building application binary..."
-if ($ldflags) {
-    wails build -platform windows/amd64 -clean -webview2 embed $ldflags
+if ($buildVersion) {
+    wails build -platform windows/amd64 -clean -webview2 embed -ldflags "-X mtgcollection/internal/version.Version=$buildVersion"
 } else {
     wails build -platform windows/amd64 -clean -webview2 embed
+}
+if ($LASTEXITCODE -ne 0) {
+    throw "wails build failed (exit $LASTEXITCODE)"
 }
 
 $appBinary = Join-Path $repoRoot "build\bin\mtg-collection.exe"
@@ -54,7 +57,7 @@ if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
 $installerDir = Join-Path $repoRoot "build\windows\installer"
 Push-Location $installerDir
 try {
-    makensis -DARG_WAILS_AMD64_BINARY=..\..\bin\mtg-collection.exe project.nsi
+    makensis "-DARG_WAILS_AMD64_BINARY=..\..\bin\mtg-collection.exe" project.nsi
     if ($LASTEXITCODE -ne 0) {
         throw "makensis failed (exit $LASTEXITCODE)"
     }
