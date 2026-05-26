@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { Deck, DeckCard } from "../backend";
+import { CardImage } from "../components/CardImage";
 import { EmptyState } from "../components/EmptyState";
 import { Stat } from "../components/Stat";
 import { boardLabel, isMainboard, normalizeBoard, partitionDeckCards, totalQuantity } from "../lib/deckBoard";
@@ -259,34 +260,44 @@ function DeckBoardGrid({
       <h3 className="deck-board-heading">{title}</h3>
       <div className="card-grid">
         {rows.map((row) => (
-          <article key={`${normalizeBoard(row.board)}-${row.card.oracleId}`} className="card-row">
-            <h3>{row.card.name}</h3>
-            <div className="stat-row">
-              <Stat label="Qty" value={row.quantity} />
-            </div>
-            <div className="deck-card-actions">
-              <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", row.quantity - 1)}>
-                −
-              </button>
-              <input
-                aria-label={`Quantity for ${row.card.name}`}
-                type="number"
-                min={0}
-                defaultValue={row.quantity}
-                key={`${normalizeBoard(row.board)}-${row.card.oracleId}-${row.quantity}`}
-                onBlur={(event) => {
-                  const qty = Number(event.target.value);
-                  if (!Number.isNaN(qty) && qty !== row.quantity) {
-                    onSetQuantity(row.card.oracleId, row.board ?? "main", qty);
-                  }
-                }}
-              />
-              <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", row.quantity + 1)}>
-                +
-              </button>
-              <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", 0)}>
-                Remove
-              </button>
+          <article key={`${normalizeBoard(row.board)}-${row.card.oracleId}`} className="card-row deck-card-row">
+            <CardImage
+              name={row.card.name}
+              small={row.card.imageSmall}
+              normal={row.card.imageNormal}
+              colorIdentity={row.card.colorIdentity}
+              size="tile"
+              alt={row.card.name}
+            />
+            <div className="deck-card-row-body">
+              <h3>{row.card.name}</h3>
+              <div className="stat-row">
+                <Stat label="Qty" value={row.quantity} />
+              </div>
+              <div className="deck-card-actions">
+                <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", row.quantity - 1)}>
+                  −
+                </button>
+                <input
+                  aria-label={`Quantity for ${row.card.name}`}
+                  type="number"
+                  min={0}
+                  defaultValue={row.quantity}
+                  key={`${normalizeBoard(row.board)}-${row.card.oracleId}-${row.quantity}`}
+                  onBlur={(event) => {
+                    const qty = Number(event.target.value);
+                    if (!Number.isNaN(qty) && qty !== row.quantity) {
+                      onSetQuantity(row.card.oracleId, row.board ?? "main", qty);
+                    }
+                  }}
+                />
+                <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", row.quantity + 1)}>
+                  +
+                </button>
+                <button type="button" className="ghost" onClick={() => onSetQuantity(row.card.oracleId, row.board ?? "main", 0)}>
+                  Remove
+                </button>
+              </div>
             </div>
           </article>
         ))}

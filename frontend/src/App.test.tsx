@@ -62,7 +62,8 @@ describe("App", () => {
     expect(screen.getByText("Control")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Burn" }));
-    expect(await screen.findByText("Lightning Bolt")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Lightning Bolt" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Lightning Bolt")).toBeInTheDocument();
     expect(api.ListDeckCards).toHaveBeenCalledWith(1);
   });
 
