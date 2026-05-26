@@ -66,15 +66,18 @@ jobs:
           npm ci --prefix frontend
           npm test --prefix frontend
 
-      - name: Build application
+      - name: Build application and installer
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          wails build -platform windows/amd64 -clean -webview2 embed -ldflags "-X mtgcollection/internal/version.Version=$version"
-
-      - name: Build NSIS installer
-        shell: pwsh
-        run: ./scripts/build-nsis-installer.ps1
+          wails build -platform windows/amd64 -clean -nsis -webview2 embed -ldflags "-X mtgcollection/internal/version.Version=$version"
+          if ($LASTEXITCODE -ne 0) {
+            throw "wails build failed (exit $LASTEXITCODE)"
+          }
+          $installer = Get-ChildItem build/bin -Filter "*-installer.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "NSIS installer not found under build/bin after wails build -nsis"
+          }
 
       - name: Generate checksums
         shell: pwsh

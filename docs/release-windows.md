@@ -23,7 +23,7 @@ Portable use: `mtg-collection.exe` in the same release is the app binary without
    ```
 3. Watch the **Release Windows** workflow. It will:
    - Inject `v0.1.0` into [`wails.json`](../wails.json) and [`frontend/package.json`](../frontend/package.json)
-   - Run tests, `wails build`, build the NSIS installer
+   - Run tests, then `wails build -nsis` (app + installer)
    - Publish `mtg-collection-amd64-installer.exe`, `mtg-collection.exe`, and `checksums.txt` to GitHub Releases
 
 ### Manual workflow run
@@ -36,13 +36,15 @@ Actions → **Release Windows** → **Run workflow**. Artifacts upload to the wo
 .\scripts\build-windows-release.ps1 -Version 0.1.0
 ```
 
-Requires Wails CLI and NSIS (`winget install NSIS.NSIS` or `choco install nsis`). Ensure `makensis` is on your `PATH`. Use `-SkipTests` when iterating.
+Requires Wails CLI and NSIS (`winget install NSIS.NSIS`). Use `-SkipTests` when iterating.
 
 ## Build pipeline
 
-1. `wails build` produces `build\bin\mtg-collection.exe` (WebView2 embedded).
-2. `makensis` packages it using [`build/windows/installer/project.nsi`](../build/windows/installer/project.nsi).
+1. `wails build -nsis` compiles the app, writes `build/windows/installer/wails_tools.nsh` from `wails.json`, and runs `makensis` on [`build/windows/installer/project.nsi`](../build/windows/installer/project.nsi).
+2. Outputs land in `build/bin/` (`mtg-collection.exe` and `mtg-collection-amd64-installer.exe`).
 3. SHA-256 checksums are written to `checksums.txt` for release assets.
+
+`wails_tools.nsh` is gitignored and must not be committed; it is recreated on every release build.
 
 ## Scryfall
 
