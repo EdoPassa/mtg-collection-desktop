@@ -36,7 +36,7 @@ Actions → **Release Windows** → **Run workflow**. Artifacts upload to the wo
 .\scripts\build-windows-release.ps1 -Version 0.1.0
 ```
 
-Requires Wails CLI and NSIS (`winget install NSIS.NSIS`). Use `-SkipTests` when iterating.
+Requires Wails CLI and NSIS (`winget install NSIS.NSIS` or `choco install nsis`). Ensure `makensis` is on your `PATH`. Use `-SkipTests` when iterating.
 
 ## Build pipeline
 
