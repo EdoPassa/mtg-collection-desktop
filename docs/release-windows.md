@@ -28,7 +28,22 @@ Portable use: `mtg-collection.exe` in the same release is the app binary without
 
 ### Manual workflow run
 
-Actions → **Release Windows** → **Run workflow**. Artifacts upload to the workflow run when the ref is not a `v*` tag; tagged pushes publish a GitHub Release.
+Actions → **Release Windows** → **Run workflow**.
+
+Important: `workflow_dispatch` only works from the **default branch** (`main`). In the dropdown, choose **Branch: main**, then Run workflow.
+
+If you see **Failed to queue workflow run**, check [Troubleshooting](#troubleshooting) below.
+
+Artifacts upload to the workflow run when the ref is not a `v*` tag; tagged pushes publish a GitHub Release.
+
+### Troubleshooting
+
+| Symptom | What to do |
+| --- | --- |
+| **Failed to queue workflow run** | Enable Actions: repo **Settings → Actions → General → Allow all actions**. Confirm you run from branch **main**. Read the red error detail in the popup (often YAML or permissions). |
+| Workflow never appears | Push `.github/workflows/release-windows.yml` to `main` first. |
+| Re-run an old tag | Tags do not re-fire on re-push. Use **Run workflow** on `main`, or delete the tag and push again. |
+| Stuck in **Queued** | Cancel old runs on the Actions tab; check [GitHub Status](https://www.githubstatus.com/). For private repos, check billing/minutes. |
 
 ### Local release build
 

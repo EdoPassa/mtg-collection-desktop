@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.x"
+          go-version: "1.25.0"
           cache-dependency-path: go.sum
 
       - uses: actions/setup-node@v4
@@ -54,7 +54,23 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Install NSIS
-        uses: negrutiu/nsis-install@v2
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $makensis = @(
+            "${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+            "$env:ProgramFiles\NSIS\makensis.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $makensis -and $env:ChocolateyInstall) {
+            $found = Get-ChildItem "$env:ChocolateyInstall\lib\nsis" -Recurse -Filter makensis.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $makensis = $found.FullName }
+          }
+          if (-not $makensis) {
+            throw "makensis.exe not found after NSIS install"
+          }
+          $nsisDir = Split-Path $makensis -Parent
+          Write-Host "NSIS directory: $nsisDir"
+          Add-Content -Path $env:GITHUB_PATH -Value $nsisDir
 
       - name: Inject version metadata
         shell: pwsh
