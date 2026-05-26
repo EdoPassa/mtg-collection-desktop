@@ -23,8 +23,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Build directories
-build/
+# Build output (packaging templates under build/ are tracked)
+build/bin/
+build/windows/icon.ico
+build/windows/installer/wails_tools.nsh
+build/windows/installer/tmp/
 dist/
 target/
 .worktrees/

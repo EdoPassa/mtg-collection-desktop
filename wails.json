@@ -9,5 +9,13 @@
   "build:tags": "webkit2_41",
   "author": {
     "name": "MTG Collection"
-  }
+  },
+  "info": {
+    "companyName": "MTG Collection",
+    "productName": "MTG Collection",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 MTG Collection",
+    "comments": "Local MTG collection manager (https://github.com/wailsapp/wails)"
+  },
+  "nsisType": "multiple"
 }

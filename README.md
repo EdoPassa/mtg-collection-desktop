@@ -4,6 +4,14 @@ Local desktop app for tracking a Magic: The Gathering card collection, comparing
 
 Built with **Go**, **Wails v2**, **React**, and **SQLite**. Card names are resolved through Scryfall using a bulk oracle cache when available, with API fallback when the cache is missing or stale.
 
+## Downloads (Windows)
+
+Pre-built installers are published on [GitHub Releases](https://github.com/EdoPassa/mtg-collection-desktop/releases). Download `mtg-collection-amd64-installer.exe` and verify the SHA-256 hash in `checksums.txt`.
+
+Requirements: Windows 10 or later. First launch may need internet access to download the Scryfall oracle bulk cache. Windows SmartScreen may warn on unsigned downloads; verify the checksum before running.
+
+See [`docs/release-windows.md`](docs/release-windows.md) for install details and maintainer release setup.
+
 ## Features
 
 - **Import** — Preview and commit card lists from plain text or CSV; unresolved rows are reported before commit.
@@ -47,10 +55,14 @@ wails build
 **Windows**
 
 ```powershell
+# Quick local build (app binary only)
 .\scripts\build_windows.ps1
+
+# Installer for release (needs NSIS)
+.\scripts\build-windows-release.ps1 -Version 0.1.0
 ```
 
-The script checks for the Wails CLI and runs `wails build`. Output is `build/bin/mtg-collection` (or `mtg-collection.exe` on Windows).
+Output is under `build/bin/` (`mtg-collection.exe` and `mtg-collection-amd64-installer.exe` when NSIS is installed).
 
 ### Backend smoke check
 
@@ -115,6 +127,7 @@ Contributor docs:
 - [`docs/architecture.md`](docs/architecture.md) — module boundaries and data flow
 - [`docs/rewrite_contract.md`](docs/rewrite_contract.md) — behavior the implementation must preserve
 - [`docs/go_rewrite_cutover.md`](docs/go_rewrite_cutover.md) — packaging and manual QA checklist
+- [`docs/release-windows.md`](docs/release-windows.md) — Windows releases and GitHub Actions
 
 ## Tests
 

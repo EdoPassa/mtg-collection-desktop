@@ -55,7 +55,7 @@ func NewClient(opts Options) *Client {
 	}
 	userAgent := strings.TrimSpace(opts.UserAgent)
 	if userAgent == "" {
-		userAgent = DefaultUserAgent
+		userAgent = DefaultUserAgent()
 	}
 	return &Client{baseURL: baseURL, httpClient: httpClient, userAgent: userAgent, minInterval: minInterval, maxAttempts: maxAttempts}
 }
