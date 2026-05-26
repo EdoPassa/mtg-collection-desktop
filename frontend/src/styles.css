@@ -1,22 +1,30 @@
 :root {
-  --bg-deep: #0a0a0c;
-  --bg-base: #0f0f12;
-  --bg-raised: #141416;
-  --bg-panel: #18181b;
-  --bg-card: #111114;
-  --bg-input: #0f0f12;
-  --bg-hover: #1c1c20;
-  --border: rgba(214, 180, 120, 0.14);
-  --border-strong: rgba(214, 180, 120, 0.28);
-  --text: #f3f4f6;
-  --text-muted: #a1a1aa;
-  --text-dim: #71717a;
-  --gold: #d4a853;
-  --gold-bright: #f0d48a;
-  --gold-dim: #8b6914;
-  --gold-soft: rgba(212, 168, 83, 0.1);
-  --accent: #c2410c;
-  --accent-soft: rgba(212, 168, 83, 0.12);
+  /* Arcane Navy */
+  --bg-deep: #06080f;
+  --bg-base: #0a0e18;
+  --bg-raised: #0f1524;
+  --bg-panel: #131b2e;
+  --bg-card: #0c111c;
+  --bg-input: #0a0e18;
+  --bg-hover: #182238;
+  --border: rgba(148, 163, 184, 0.14);
+  --border-strong: rgba(125, 211, 252, 0.28);
+  --text: #e8eef7;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --gold: #7dd3fc;
+  --gold-bright: #bae6fd;
+  --gold-dim: #0369a1;
+  --gold-soft: rgba(125, 211, 252, 0.1);
+  --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.14);
+  --accent-border: rgba(125, 211, 252, 0.35);
+  --accent-ring: rgba(125, 211, 252, 0.55);
+  --accent-ring-soft: rgba(125, 211, 252, 0.12);
+  --cta-from: #4f46e5;
+  --cta-to: #4338ca;
+  --cta-hover-from: #6366f1;
+  --cta-hover-to: #4f46e5;
   --success: #4ade80;
   --success-soft: rgba(74, 222, 128, 0.12);
   --warning: #fbbf24;
@@ -24,15 +32,15 @@
   --danger: #f87171;
   --danger-soft: rgba(248, 113, 113, 0.12);
   --info: #93c5fd;
-  --info-soft: rgba(212, 168, 83, 0.08);
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  --info-soft: rgba(125, 211, 252, 0.08);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
   --radius-xl: 1.25rem;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
-  --shadow-glow: 0 0 40px rgba(212, 168, 83, 0.08);
+  --shadow-glow: 0 0 40px rgba(125, 211, 252, 0.08);
   --font-display: "Cinzel", Georgia, "Times New Roman", serif;
   --font-body: "DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --sidebar-width: 15.5rem;
@@ -53,8 +61,8 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 168, 83, 0.07), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(194, 65, 12, 0.04), transparent),
+    radial-gradient(ellipse 70% 45% at 20% -10%, rgba(125, 211, 252, 0.08), transparent),
+    radial-gradient(ellipse 55% 35% at 100% 100%, rgba(99, 102, 241, 0.06), transparent),
     var(--bg-deep);
 }
 
@@ -122,7 +130,7 @@ li + li {
 
 .brand-mark {
   align-items: center;
-  background: linear-gradient(145deg, rgba(212, 168, 83, 0.2), rgba(194, 65, 12, 0.15));
+  background: linear-gradient(145deg, rgba(125, 211, 252, 0.18), rgba(99, 102, 241, 0.14));
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   color: var(--gold-bright);
@@ -204,7 +212,7 @@ li + li {
 
 .tab-btn[aria-current="page"] {
   background: var(--gold-soft);
-  border-color: rgba(212, 168, 83, 0.35);
+  border-color: var(--accent-border);
   color: var(--gold-bright);
 }
 
@@ -410,7 +418,7 @@ button {
 
 button:hover:not(:disabled) {
   background: var(--bg-hover);
-  border-color: rgba(212, 168, 83, 0.4);
+  border-color: var(--accent-border);
 }
 
 button:active:not(:disabled) {
@@ -423,14 +431,14 @@ button:disabled {
 }
 
 button.primary {
-  background: linear-gradient(180deg, #b45309, #9a3412);
-  border-color: rgba(240, 212, 138, 0.35);
-  color: #fffbeb;
+  background: linear-gradient(180deg, var(--cta-hover-from), var(--cta-to));
+  border-color: rgba(186, 230, 253, 0.35);
+  color: #eff6ff;
   box-shadow: var(--shadow-sm);
 }
 
 button.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #c2410c, #b45309);
+  background: linear-gradient(180deg, var(--cta-hover-from), var(--cta-hover-to));
   border-color: var(--gold);
 }
 
@@ -582,8 +590,8 @@ input:focus,
 textarea:focus,
 .select-control:focus,
 button.select-control:focus {
-  border-color: rgba(212, 168, 83, 0.55);
-  box-shadow: 0 0 0 3px rgba(212, 168, 83, 0.12);
+  border-color: var(--accent-ring);
+  box-shadow: 0 0 0 3px var(--accent-ring-soft);
   outline: none;
 }
 
@@ -787,7 +795,7 @@ label {
 
 .badge--deck {
   background: var(--gold-soft);
-  border: 1px solid rgba(212, 168, 83, 0.35);
+  border: 1px solid var(--accent-border);
   color: var(--gold-bright);
 }
 
@@ -952,7 +960,7 @@ label.analysis-field {
 
 .preset-chip--active {
   background: var(--gold-soft);
-  border-color: rgba(212, 168, 83, 0.4);
+  border-color: var(--accent-border);
   color: var(--gold-bright);
 }
 
@@ -1086,7 +1094,7 @@ label.analysis-field {
 
 .mana-pip--toggle-active {
   opacity: 1;
-  box-shadow: 0 0 0 2px rgba(212, 168, 83, 0.45);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 .color-dot {
@@ -1137,7 +1145,7 @@ label.analysis-field {
 
 .card-image--placeholder {
   align-items: center;
-  background: linear-gradient(160deg, rgba(212, 168, 83, 0.08), rgba(194, 65, 12, 0.08));
+  background: linear-gradient(160deg, rgba(125, 211, 252, 0.08), rgba(99, 102, 241, 0.08));
   display: flex;
   justify-content: center;
   padding: 0.3rem;
@@ -1161,7 +1169,7 @@ label.analysis-field {
 .card-image--b { border-color: rgba(120, 113, 108, 0.55); }
 .card-image--r { border-color: rgba(234, 113, 88, 0.45); }
 .card-image--g { border-color: rgba(95, 179, 122, 0.45); }
-.card-image--m { border-color: rgba(240, 212, 138, 0.45); }
+.card-image--m { border-color: rgba(186, 230, 253, 0.45); }
 .card-image--c { border-color: var(--border-strong); }
 
 /* =====================================================================
