@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { CollectionItem, LentCard } from "../backend";
 import { EmptyState } from "../components/EmptyState";
+import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
 import type { PanelProps } from "./types";
 
@@ -69,9 +70,12 @@ export function LendingPanel({ api, setMessage }: PanelProps) {
   return (
     <section className="panel" aria-label="Lending">
       <div className="toolbar">
-        <label>
-          Card
-          <select
+        <div className="field field--inline field--grow">
+          <label className="field-label" htmlFor="lending-card">
+            Card
+          </label>
+          <Select
+            id="lending-card"
             aria-label="Card to lend"
             value={oracleId}
             onChange={(event) => setOracleId(event.target.value)}
@@ -83,8 +87,8 @@ export function LendingPanel({ api, setMessage }: PanelProps) {
                 {row.card.name} ({row.available} available)
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
         <input aria-label="Borrower" placeholder="Borrower name" value={borrower} onChange={(event) => setBorrower(event.target.value)} />
         <button type="button" className="primary" onClick={lend} disabled={!oracleId || !borrower.trim()}>
           Add Lending Record

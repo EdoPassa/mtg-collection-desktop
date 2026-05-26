@@ -155,7 +155,8 @@ describe("App", () => {
     });
 
     render(<App api={api} />);
-    await userEvent.selectOptions(screen.getByLabelText("Import source mode"), "csv");
+    await userEvent.click(screen.getByLabelText("Import source mode"));
+    await userEvent.click(screen.getByRole("option", { name: "CSV file" }));
 
     const file = new File(["name,quantity\nCounterspell,2\n"], "cards.csv", { type: "text/csv" });
     const hiddenInput = document.getElementById("import-csv-file") as HTMLInputElement;

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { Deck, DeckCard } from "../backend";
 import { EmptyState } from "../components/EmptyState";
+import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
 import { countLandsInDeck } from "../lib/cardTypes";
 import { isMainboard, totalQuantity } from "../lib/deckBoard";
@@ -202,9 +203,12 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
             <>
               <div className="toolbar analysis-toolbar">
                 <h3>{selectedDeck.name}</h3>
-                <label className="analysis-field">
-                  Format
-                  <select
+                <div className="field field--inline">
+                  <label className="field-label" htmlFor="deck-format-target">
+                    Format
+                  </label>
+                  <Select
+                    id="deck-format-target"
                     aria-label="Deck format target"
                     value={formatTarget}
                     onChange={(event) => setFormatTarget(event.target.value as typeof formatTarget)}
@@ -214,8 +218,8 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                         {format.label}
                       </option>
                     ))}
-                  </select>
-                </label>
+                  </Select>
+                </div>
               </div>
 
               <div className="stat-row">
@@ -261,7 +265,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                   <>
                     <label className="analysis-field">
                       Card
-                      <select
+                      <Select
                         aria-label="Card to analyze"
                         value={selectedOracleId}
                         onChange={(event) => setSelectedOracleId(event.target.value)}
@@ -271,7 +275,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                             {row.quantity}x {row.card.name}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </label>
                     <label className="analysis-field">
                       At least copies

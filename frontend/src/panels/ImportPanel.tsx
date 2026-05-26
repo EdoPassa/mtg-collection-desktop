@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { ImportPreview } from "../backend";
 import { ResultList } from "../components/ResultList";
+import { Select } from "../components/Select";
 import type { PanelProps } from "./types";
 
 type ImportMode = "text" | "csv";
@@ -68,13 +69,20 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
   return (
     <section className="panel" aria-label="Import Cards">
       <div className="toolbar">
-        <label>
-          Source
-          <select aria-label="Import source mode" value={mode} onChange={(event) => setMode(event.target.value as ImportMode)}>
+        <div className="field field--inline">
+          <label className="field-label" htmlFor="import-source-mode">
+            Source
+          </label>
+          <Select
+            id="import-source-mode"
+            aria-label="Import source mode"
+            value={mode}
+            onChange={(event) => setMode(event.target.value as ImportMode)}
+          >
             <option value="text">Plain text</option>
             <option value="csv">CSV file</option>
-          </select>
-        </label>
+          </Select>
+        </div>
         {mode === "csv" && (
           <>
             <input id={csvInputId} type="file" accept=".csv,text/csv" hidden onChange={(event) => void onCsvSelected(event.target.files?.[0])} />
