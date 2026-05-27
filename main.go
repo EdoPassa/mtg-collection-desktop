@@ -25,7 +25,8 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		Bind: []interface{}{app},
+		OnStartup: app.Startup,
+		Bind:      []interface{}{app},
 	})
 	if err != nil {
 		panic(err)

@@ -1,8 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { ImportPreview } from "../backend";
+import { subscribeWailsEvent } from "../lib/wailsEvents";
+import { ProgressBar } from "../components/ProgressBar";
 import { ResultList } from "../components/ResultList";
 import { Select } from "../components/Select";
 import type { PanelProps } from "./types";
+
+type ImportProgressState = {
+  current: number;
+  total: number;
+  label: string;
+};
 
 type ImportMode = "text" | "csv";
 
@@ -20,7 +28,19 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
   const [csvBytes, setCsvBytes] = useState<number[] | null>(null);
   const [preview, setPreview] = useState<ImportPreview>({ validated: [], unresolved: [] });
   const [busy, setBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
   const csvInputId = "import-csv-file";
+
+  useEffect(() => {
+    const unsubscribe = subscribeWailsEvent("import:progress", (payload: ImportProgressState) => {
+      setImportProgress({
+        current: payload?.current ?? 0,
+        total: payload?.total ?? 0,
+        label: payload?.label ?? ""
+      });
+    });
+    return unsubscribe;
+  }, []);
 
   const validated = preview.validated ?? [];
   const unresolved = preview.unresolved ?? [];
@@ -40,6 +60,7 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
       return;
     }
 
+    setImportProgress({ current: 0, total: 0, label: "" });
     setBusy(true);
     try {
       const next = mode === "csv" ? await api.PreviewCSVImport(csvBytes ?? []) : await api.PreviewTextImport(text);
@@ -50,6 +71,7 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
       setMessage(String(error));
     } finally {
       setBusy(false);
+      setImportProgress(null);
     }
   }
 
@@ -67,7 +89,7 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
   }
 
   return (
-    <section className="panel" aria-label="Import Cards">
+    <section className="panel" aria-label="Import Cards" aria-busy={busy}>
       <div className="toolbar">
         <div className="field field--inline">
           <label className="field-label" htmlFor="import-source-mode">
@@ -112,6 +134,12 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
           Commit Import
         </button>
       </div>
+      <ProgressBar
+        current={importProgress?.current ?? 0}
+        total={importProgress?.total ?? 0}
+        label={importProgress?.label}
+        visible={busy && importProgress !== null && (importProgress.total ?? 0) > 0}
+      />
       <ResultList title="Validated" rows={validated.map((row) => `${row.line?.quantity ?? 0}x ${row.name} (${row.source})`)} />
       <ResultList title="Unresolved" rows={unresolved} warn={unresolved.length > 0} />
     </section>

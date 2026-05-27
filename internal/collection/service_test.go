@@ -39,7 +39,7 @@ func (f fakeResolver) ResolveScryfallID(_ context.Context, id string) (resolver.
 
 func TestImportPreviewJSONNeverUsesNullSlices(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "not a valid line\n")
+	preview, err := service.PreviewTextImport(t.Context(), "not a valid line\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,10 +55,36 @@ func TestImportPreviewJSONNeverUsesNullSlices(t *testing.T) {
 	}
 }
 
+func TestPreviewTextImportReportsMonotonicProgress(t *testing.T) {
+	service := newTestService(t)
+	var progress []ImportProgress
+	_, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n4 Lightning Bolt\n", func(p ImportProgress) {
+		progress = append(progress, p)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(progress) != 3 {
+		t.Fatalf("progress callbacks = %d, want 3 (one per line)", len(progress))
+	}
+	for i, p := range progress {
+		wantCurrent := i + 1
+		if p.Current != wantCurrent || p.Total != 3 {
+			t.Fatalf("progress[%d] = %#v, want current %d total 3", i, p, wantCurrent)
+		}
+		if p.Current < (i) {
+			t.Fatalf("progress not monotonic at index %d: %#v", i, p)
+		}
+	}
+	if progress[0].Label != "Lightning Bolt" {
+		t.Fatalf("first label = %q, want Lightning Bolt", progress[0].Label)
+	}
+}
+
 func TestPreviewCSVImportReturnsNonNilSlices(t *testing.T) {
 	service := newTestService(t)
 	csv := []byte("name,quantity\nLightning Bolt,4\n")
-	preview, err := service.PreviewCSVImport(t.Context(), csv)
+	preview, err := service.PreviewCSVImport(t.Context(), csv, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +98,7 @@ func TestPreviewCSVImportReturnsNonNilSlices(t *testing.T) {
 
 func TestPreviewAndCommitImportIncrementCollection(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\nBad line\n")
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\nBad line\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +135,7 @@ func TestListCollectionReturnsEmptySliceForEmptyCollection(t *testing.T) {
 
 func TestCompareBuildDeckAndLendingUseCases(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n")
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +175,7 @@ func TestCompareBuildDeckAndLendingUseCases(t *testing.T) {
 
 func TestAddCardToDeckByName(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n")
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +213,7 @@ func TestAddCardToDeckByName(t *testing.T) {
 
 func TestListCollectionDoesNotReportNegativeAvailability(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n")
+	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +293,7 @@ func newTestService(t *testing.T) *Service {
 
 func TestCompareDeckPreservesSideboardRows(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n")
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n2 Counterspell\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -404,7 +430,7 @@ func TestListCollectionEnrichesImagesAndColorFromBulkIndex(t *testing.T) {
 // fields are simply left empty and the frontend degrades gracefully.
 func TestListCollectionWithoutBulkIndexLeavesEnrichmentFieldsEmpty(t *testing.T) {
 	service := newTestService(t)
-	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n")
+	preview, err := service.PreviewTextImport(t.Context(), "1 Lightning Bolt\n", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
