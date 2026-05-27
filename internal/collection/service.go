@@ -86,9 +86,9 @@ type DeckCompareResult struct {
 }
 
 type BuildDeckInput struct {
-	Name          string
-	ReplaceDeckID int64
-	Rows          []DeckCompareRow
+	Name          string            `json:"name"`
+	ReplaceDeckID int64             `json:"replaceDeckId"`
+	Rows          []DeckCompareRow  `json:"rows"`
 }
 
 func New(store Store, cardResolver resolver.Resolver, oracleIndex resolver.BulkOracleIndex) *Service {

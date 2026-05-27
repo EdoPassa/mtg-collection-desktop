@@ -54,6 +54,10 @@ export function ListDecks() {
   return window['go']['app']['App']['ListDecks']();
 }
 
+export function ListFormatTargets() {
+  return window['go']['app']['App']['ListFormatTargets']();
+}
+
 export function ListLentCards(arg1) {
   return window['go']['app']['App']['ListLentCards'](arg1);
 }

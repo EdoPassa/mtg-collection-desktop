@@ -3,77 +3,13 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import type { BackendApi } from "./backend";
+import { createFakeBackendTestKit } from "./test/fakeBackend";
 
 afterEach(() => cleanup());
 
-function fakeApi(): BackendApi {
-  return {
-    ResolverStatus: vi.fn().mockResolvedValue("api-only"),
-    ListCollection: vi.fn().mockResolvedValue([]),
-    PreviewTextImport: vi.fn().mockResolvedValue({ validated: [], unresolved: [] }),
-    PreviewCSVImport: vi.fn().mockResolvedValue({ validated: [], unresolved: [] }),
-    CommitImport: vi.fn().mockResolvedValue(undefined),
-    CompareDeck: vi.fn().mockResolvedValue({ rows: [], unresolved: [], repairs: [], hasUnresolved: false }),
-    BuildDeckFromCompare: vi.fn().mockResolvedValue(1),
-    ListDecks: vi.fn().mockResolvedValue([]),
-    ListDeckCards: vi.fn().mockResolvedValue([]),
-    DeleteDeck: vi.fn().mockResolvedValue(undefined),
-    RenameDeck: vi.fn().mockResolvedValue(undefined),
-    SetDeckCardQuantity: vi.fn().mockResolvedValue(undefined),
-    AddCardToDeckByName: vi.fn().mockResolvedValue(undefined),
-    LendCard: vi.fn().mockResolvedValue(undefined),
-    ListLentCards: vi.fn().mockResolvedValue([]),
-    ReturnCard: vi.fn().mockResolvedValue(undefined),
-    RepairCompareMismatches: vi.fn().mockResolvedValue(undefined),
-    FormatMissingDecklist: vi.fn().mockResolvedValue(""),
-    Hypergeometric: vi.fn().mockResolvedValue({ probability: 0, probabilityFormatted: "0.0%" }),
-    AnalyzeDeckDraw: vi.fn().mockResolvedValue({
-      populationN: 60,
-      deckTotal: 0,
-      targetSize: 60,
-      detectedLands: 0,
-      effectiveLandsK: 0,
-      effectiveSampleSize: 7,
-      cardProbability: 0,
-      cardProbabilityFormatted: "—",
-      landProbability: 0,
-      landProbabilityFormatted: "—"
-    }),
-    StartDeckSimulation: vi.fn().mockResolvedValue({
-      sessionId: "sim-test",
-      phase: "playing",
-      hand: [],
-      libraryCount: 0,
-      mulliganCount: 0,
-      canMulligan: false,
-      canDraw: false,
-      stats: {
-        landsInHand: 0,
-        libraryRemaining: 0,
-        nextDrawLandProb: 0,
-        nextDrawLandProbFormatted: "—",
-        nextDrawCardProb: 0,
-        nextDrawCardProbFormatted: "—",
-        afterOneDrawLandsProb: 0,
-        afterOneDrawLandsProbFormatted: "—",
-        minLandsThreshold: 2
-      },
-      deckId: 0,
-      formatTarget: "standard"
-    }),
-    SimNewOpening: vi.fn(),
-    SimMulligan: vi.fn(),
-    SimPutOnBottom: vi.fn(),
-    SimDrawCard: vi.fn(),
-    SimSetOracleFocus: vi.fn(),
-    EndDeckSimulation: vi.fn().mockResolvedValue(undefined)
-  };
-}
-
 describe("App", () => {
   it("switches between workflow tabs", async () => {
-    render(<App api={fakeApi()} />);
+    render(<App api={createFakeBackendTestKit().api} />);
 
     expect(await screen.findByRole("heading", { name: "Import Cards" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Collection" }));
@@ -83,12 +19,12 @@ describe("App", () => {
   });
 
   it("loads and displays saved decks", async () => {
-    const api = fakeApi();
-    vi.mocked(api.ListDecks).mockResolvedValue([
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.ListDecks).mockResolvedValue([
       { id: 1, name: "Burn" },
       { id: 2, name: "Control" }
     ]);
-    vi.mocked(api.ListDeckCards).mockResolvedValue([
+    vi.mocked(bindings.ListDeckCards).mockResolvedValue([
       {
         card: { oracleId: "oracle-bolt", name: "Lightning Bolt", scryfallUri: "https://example.test/bolt" },
         quantity: 4
@@ -105,12 +41,12 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("button", { name: "Burn" }));
     expect(await screen.findByRole("heading", { name: "Lightning Bolt" })).toBeInTheDocument();
     expect(screen.getByLabelText("Lightning Bolt")).toBeInTheDocument();
-    expect(api.ListDeckCards).toHaveBeenCalledWith(1);
+    expect(bindings.ListDeckCards).toHaveBeenCalledWith(1);
   });
 
   it("renames and deletes decks through the backend", async () => {
-    const api = fakeApi();
-    vi.mocked(api.ListDecks).mockResolvedValue([{ id: 7, name: "Burn" }]);
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.ListDecks).mockResolvedValue([{ id: 7, name: "Burn" }]);
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
 
     render(<App api={api} />);
@@ -122,16 +58,16 @@ describe("App", () => {
     await userEvent.type(nameInput, "Mono Red");
     await userEvent.click(screen.getByRole("button", { name: "Save name" }));
 
-    expect(api.RenameDeck).toHaveBeenCalledWith(7, "Mono Red");
+    expect(bindings.RenameDeck).toHaveBeenCalledWith(7, "Mono Red");
 
     await userEvent.click(screen.getByRole("button", { name: "Delete deck" }));
-    expect(api.DeleteDeck).toHaveBeenCalledWith(7);
+    expect(bindings.DeleteDeck).toHaveBeenCalledWith(7);
   });
 
   it("adds and updates deck cards through the backend", async () => {
-    const api = fakeApi();
-    vi.mocked(api.ListDecks).mockResolvedValue([{ id: 3, name: "Burn" }]);
-    vi.mocked(api.ListDeckCards).mockResolvedValue([
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.ListDecks).mockResolvedValue([{ id: 3, name: "Burn" }]);
+    vi.mocked(bindings.ListDeckCards).mockResolvedValue([
       {
         card: { oracleId: "oracle-bolt", name: "Lightning Bolt", scryfallUri: "https://example.test/bolt" },
         quantity: 2
@@ -143,17 +79,17 @@ describe("App", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
     await userEvent.click(await screen.findByRole("button", { name: "+" }));
 
-    expect(api.SetDeckCardQuantity).toHaveBeenCalledWith(3, "oracle-bolt", "main", 3);
+    expect(bindings.SetDeckCardQuantity).toHaveBeenCalledWith(3, "oracle-bolt", "main", 3);
 
     await userEvent.type(screen.getByLabelText("Card name to add"), "Counterspell");
     await userEvent.click(screen.getByRole("button", { name: "Add card" }));
 
-    expect(api.AddCardToDeckByName).toHaveBeenCalledWith(3, "Counterspell", 1);
+    expect(bindings.AddCardToDeckByName).toHaveBeenCalledWith(3, "Counterspell", 1);
   });
 
   it("loads collection data from the backend", async () => {
-    const api = fakeApi();
-    vi.mocked(api.ListCollection).mockResolvedValue([
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.ListCollection).mockResolvedValue([
       {
         card: { oracleId: "oracle-bolt", name: "Lightning Bolt", scryfallUri: "https://example.test/bolt" },
         quantity: 4,
@@ -171,8 +107,8 @@ describe("App", () => {
   });
 
   it("renders import preview when the backend returns null slices", async () => {
-    const api = fakeApi();
-    vi.mocked(api.PreviewTextImport).mockResolvedValue({ validated: null, unresolved: null } as never);
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.PreviewTextImport).mockResolvedValue({ validated: null, unresolved: null } as never);
 
     render(<App api={api} />);
     await userEvent.click(screen.getByRole("button", { name: "Validate" }));
@@ -182,8 +118,8 @@ describe("App", () => {
   });
 
   it("validates CSV imports through the backend", async () => {
-    const api = fakeApi();
-    vi.mocked(api.PreviewCSVImport).mockResolvedValue({
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.PreviewCSVImport).mockResolvedValue({
       validated: [
         {
           line: { raw: "csv", quantity: 2, name: "Counterspell" },
@@ -205,14 +141,14 @@ describe("App", () => {
     await userEvent.upload(hiddenInput, file);
     await userEvent.click(screen.getByRole("button", { name: "Validate" }));
 
-    expect(api.PreviewCSVImport).toHaveBeenCalled();
+    expect(bindings.PreviewCSVImport).toHaveBeenCalled();
     expect(await screen.findByText("Validated 1 row(s).")).toBeInTheDocument();
     expect(screen.getByText("2x Counterspell (bulk)")).toBeInTheDocument();
   });
 
   it("renders an empty collection instead of crashing when the backend returns null", async () => {
-    const api = fakeApi();
-    vi.mocked(api.ListCollection).mockResolvedValue(null as never);
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.ListCollection).mockResolvedValue(null as never);
 
     render(<App api={api} />);
     await userEvent.click(screen.getByRole("button", { name: "Collection" }));
@@ -221,8 +157,8 @@ describe("App", () => {
   });
 
   it("renders an empty lending list instead of crashing when the backend returns null", async () => {
-    const api = fakeApi();
-    vi.mocked(api.ListLentCards).mockResolvedValue(null as never);
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.ListLentCards).mockResolvedValue(null as never);
 
     render(<App api={api} />);
     await userEvent.click(screen.getByRole("button", { name: "Lending" }));
@@ -231,8 +167,8 @@ describe("App", () => {
   });
 
   it("shows repair candidates and refreshes compare results after repairing", async () => {
-    const api = fakeApi();
-    vi.mocked(api.CompareDeck)
+    const { api, bindings } = createFakeBackendTestKit();
+    vi.mocked(bindings.CompareDeck)
       .mockResolvedValueOnce({
         rows: [
           {
@@ -272,7 +208,7 @@ describe("App", () => {
     expect(await screen.findByText("Repair old-shock to Shock")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Repair Mismatches" }));
 
-    expect(api.RepairCompareMismatches).toHaveBeenCalledWith([
+    expect(bindings.RepairCompareMismatches).toHaveBeenCalledWith([
       {
         fromOracleId: "old-shock",
         toCard: { oracleId: "new-shock", name: "Shock", scryfallUri: "https://example.test/new" }
@@ -280,6 +216,6 @@ describe("App", () => {
     ]);
     expect(await screen.findByText("Compared 1 card(s).")).toBeInTheDocument();
     expect(screen.queryByText("Repair old-shock to Shock")).not.toBeInTheDocument();
-    expect(api.CompareDeck).toHaveBeenCalledTimes(2);
+    expect(bindings.CompareDeck).toHaveBeenCalledTimes(2);
   });
 });

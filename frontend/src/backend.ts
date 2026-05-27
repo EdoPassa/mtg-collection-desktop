@@ -1,5 +1,6 @@
 import * as wailsApi from "../wailsjs/go/app/App";
 import type { analysis, cards, collection, storage } from "../wailsjs/go/models";
+import { EventsOn } from "../wailsjs/runtime/runtime";
 
 // Plain strips Go method stubs from Wails-generated model types for use in the frontend.
 type Plain<T> = T extends Array<infer U>
@@ -20,6 +21,7 @@ export type LentCard = Plain<cards.LentCard>;
 export type Deck = Plain<cards.Deck>;
 export type DeckCard = Plain<cards.DeckCard>;
 
+export type FormatTarget = Plain<analysis.FormatTarget>;
 export type HypergeometricRequest = Plain<analysis.HypergeometricRequest>;
 export type HypergeometricResult = Plain<analysis.HypergeometricResult>;
 export type DeckDrawAnalysisRequest = Plain<analysis.DeckDrawAnalysisRequest>;
@@ -28,10 +30,14 @@ export type SimulationState = Plain<analysis.SimulationState>;
 export type SimulationCard = Plain<analysis.SimulationCard>;
 export type DrawStats = Plain<analysis.DrawStats>;
 
+/** Matches app.ImportProgressEvent in Go. */
+export const ImportProgressEvent = "import:progress";
+
 export type WailsBindings = typeof wailsApi;
 
 export type BackendApi = {
   ResolverStatus(): Promise<string>;
+  ListFormatTargets(): Promise<FormatTarget[]>;
   ListCollection(): Promise<CollectionItem[]>;
   PreviewTextImport(text: string): Promise<ImportPreview>;
   PreviewCSVImport(data: number[]): Promise<ImportPreview>;
@@ -65,10 +71,31 @@ export type BackendApi = {
   EndDeckSimulation(sessionID: string): Promise<void>;
 };
 
+type WailsRuntime = {
+  EventsOnMultiple?: (eventName: string, callback: (...data: unknown[]) => void, maxCallbacks: number) => () => void;
+};
+
+function wailsRuntime(): WailsRuntime | undefined {
+  if (typeof window === "undefined") {
+    return undefined;
+  }
+  return (window as Window & { runtime?: WailsRuntime }).runtime;
+}
+
+/** Subscribe to a Wails runtime event; no-op outside the desktop shell (e.g. Vitest). */
+export function subscribeWailsEvent<T>(eventName: string, callback: (payload: T) => void): () => void {
+  const runtime = wailsRuntime();
+  if (!runtime?.EventsOnMultiple) {
+    return () => {};
+  }
+  return EventsOn(eventName, (payload) => callback(payload as T));
+}
+
 export function createBackendApi(overrides: Partial<WailsBindings> = {}): BackendApi {
   const bindings = { ...wailsApi, ...overrides } as WailsBindings;
   return {
     ResolverStatus: bindings.ResolverStatus,
+    ListFormatTargets: () => bindings.ListFormatTargets() as Promise<FormatTarget[]>,
     ListCollection: () => bindings.ListCollection() as Promise<CollectionItem[]>,
     PreviewTextImport: (text) => bindings.PreviewTextImport(text) as Promise<ImportPreview>,
     PreviewCSVImport: (data) => bindings.PreviewCSVImport(data) as Promise<ImportPreview>,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { ImportPreview } from "../backend";
-import { subscribeWailsEvent } from "../lib/wailsEvents";
+import { ImportProgressEvent, subscribeWailsEvent } from "../backend";
 import { ProgressBar } from "../components/ProgressBar";
 import { ResultList } from "../components/ResultList";
 import { Select } from "../components/Select";
@@ -32,7 +32,7 @@ export function ImportPanel({ api, setMessage }: PanelProps) {
   const csvInputId = "import-csv-file";
 
   useEffect(() => {
-    const unsubscribe = subscribeWailsEvent("import:progress", (payload: ImportProgressState) => {
+    const unsubscribe = subscribeWailsEvent(ImportProgressEvent, (payload: ImportProgressState) => {
       setImportProgress({
         current: payload?.current ?? 0,
         total: payload?.total ?? 0,

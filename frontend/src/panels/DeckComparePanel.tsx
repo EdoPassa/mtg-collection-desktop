@@ -24,7 +24,7 @@ export function DeckComparePanel({ api, setMessage }: PanelProps) {
 
   async function buildDeck() {
     try {
-      await api.BuildDeckFromCompare({ Name: deckName, ReplaceDeckID: 0, Rows: result.rows });
+      await api.BuildDeckFromCompare({ name: deckName, replaceDeckId: 0, rows: result.rows });
       setMessage(`Built deck ${deckName}.`);
     } catch (error) {
       setMessage(String(error));

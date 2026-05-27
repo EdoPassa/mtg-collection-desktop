@@ -31,6 +31,8 @@ export function ListDeckCards(arg1:number):Promise<Array<cards.DeckCard>>;
 
 export function ListDecks():Promise<Array<cards.Deck>>;
 
+export function ListFormatTargets():Promise<Array<analysis.FormatTarget>>;
+
 export function ListLentCards(arg1:boolean):Promise<Array<cards.LentCard>>;
 
 export function PreviewCSVImport(arg1:Array<number>):Promise<collection.ImportPreview>;

@@ -1,3 +1,5 @@
+// Package main is the CLI smoke-test entry (go run ./cmd/mtg-collection).
+// The Wails GUI uses the repository root main.go and bootstrap.go (Packaged app-data).
 package main
 
 import (

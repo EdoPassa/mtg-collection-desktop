@@ -14,6 +14,11 @@ func (a *App) ensureSessions() *analysis.SessionStore {
 	return a.sessions
 }
 
+// ListFormatTargets returns deck size presets for analysis UI.
+func (a *App) ListFormatTargets() []analysis.FormatTarget {
+	return analysis.ListFormatTargets()
+}
+
 // Hypergeometric runs the generic calculator.
 func (a *App) Hypergeometric(req analysis.HypergeometricRequest) (analysis.HypergeometricResult, error) {
 	return analysis.ComputeHypergeometric(req)

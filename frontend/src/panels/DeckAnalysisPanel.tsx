@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { Deck, DeckCard } from "../backend";
+import type { Deck, DeckCard, FormatTarget } from "../backend";
 import { EmptyState } from "../components/EmptyState";
 import { Select } from "../components/Select";
 import { isMainboard } from "../lib/deckBoard";
@@ -9,21 +9,30 @@ import type { PanelProps } from "./types";
 
 type AnalysisView = "simulator" | "calculators";
 
-const FORMAT_TARGETS = [
-  { id: "standard", label: "60-card" },
-  { id: "commander", label: "100-card" }
-] as const;
-
 export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [cards, setCards] = useState<DeckCard[]>([]);
-  const [formatTarget, setFormatTarget] = useState<(typeof FORMAT_TARGETS)[number]["id"]>("standard");
+  const [formatTargets, setFormatTargets] = useState<FormatTarget[]>([]);
+  const [formatTarget, setFormatTarget] = useState("");
   const [selectedOracleId, setSelectedOracleId] = useState("");
   const [view, setView] = useState<AnalysisView>("simulator");
 
+  const selectedFormat = formatTargets.find((format) => format.id === formatTarget) ?? null;
   const selectedDeck = decks.find((deck) => deck.id === selectedId) ?? null;
   const mainboardCards = useMemo(() => cards.filter((row) => isMainboard(row.board)), [cards]);
+
+  async function loadFormatTargets() {
+    try {
+      const next = (await api.ListFormatTargets()) ?? [];
+      setFormatTargets(next);
+      if (next.length > 0 && !next.some((format) => format.id === formatTarget)) {
+        setFormatTarget(next[0].id);
+      }
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
 
   async function loadDecks() {
     try {
@@ -56,6 +65,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
   }
 
   useEffect(() => {
+    void loadFormatTargets();
     void loadDecks();
   }, []);
 
@@ -104,6 +114,8 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
         <div className="deck-browser-detail analysis-detail">
           {selectedDeck === null ? (
             <EmptyState title="Select a deck" detail="Pick a deck to run the simulator or calculators." />
+          ) : formatTargets.length === 0 || selectedFormat === null ? (
+            <EmptyState title="Loading formats" detail="Format presets are loaded from the server." />
           ) : (
             <>
               <div className="toolbar analysis-toolbar">
@@ -116,11 +128,9 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                     id="deck-format-target"
                     aria-label="Deck format target"
                     value={formatTarget}
-                    onChange={(event) =>
-                      setFormatTarget(event.target.value as (typeof FORMAT_TARGETS)[number]["id"])
-                    }
+                    onChange={(event) => setFormatTarget(event.target.value)}
                   >
-                    {FORMAT_TARGETS.map((format) => (
+                    {formatTargets.map((format) => (
                       <option key={format.id} value={format.id}>
                         {format.label}
                       </option>
@@ -167,6 +177,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                   deck={selectedDeck}
                   cards={cards}
                   formatTarget={formatTarget}
+                  formatTargetSize={selectedFormat.size}
                 />
               )}
             </>

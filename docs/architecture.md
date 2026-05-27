@@ -43,8 +43,14 @@ This document explains how the MTG Collection Desktop app is organized and how d
   - keeps UI-facing behavior independent from SQLite query details.
 
 - `internal/app`
-  - Wails-bound facade over `internal/collection`;
-  - converts UI calls into service operations with desktop-safe defaults.
+  - Wails-bound facade over `internal/collection` and `internal/analysis`;
+  - converts UI calls into service operations with desktop-safe defaults;
+  - owns in-memory deck simulation sessions (`SessionStore`).
+
+- `internal/analysis`
+  - hypergeometric calculator, deck pool expansion, draw-odds analysis, and opening-hand simulation;
+  - format presets (`ListFormatTargets`) and land detection via `internal/cards`;
+  - no SQLite or HTTP — pure logic consumed by `internal/app`.
 
 - `internal/appdata`
   - resolves development versus packaged data/cache locations;
@@ -52,7 +58,8 @@ This document explains how the MTG Collection Desktop app is organized and how d
 
 - `frontend/src`
   - React application shell and workflow panels;
-  - uses generated `frontend/wailsjs` models/bindings instead of hand-written API shapes.
+  - calls the backend only through `frontend/src/backend.ts` (typed wrapper over `frontend/wailsjs`);
+  - presentation helpers (mana symbols, board labels, filters) stay in TS; business rules stay in Go.
 
 ## Data model
 
@@ -78,6 +85,14 @@ Design notes:
 4. `internal/resolver` validates each line to canonical card identity.
 5. UI displays validated rows and unresolved entries.
 6. Commit step upserts card metadata and increments collection in one transaction block.
+
+## Deck analysis flow
+
+1. User selects a saved deck and format preset (`App.ListFormatTargets`).
+2. **Calculators** call `App.AnalyzeDeckDraw` / `App.Hypergeometric` with deck rows loaded in Go.
+3. **Simulator** calls `App.StartDeckSimulation` and follow-up session methods; RNG and library state live server-side until `EndDeckSimulation`.
+
+Land counts and mainboard filtering use Scryfall `type_line` from stored card metadata (bulk cache), not client-side heuristics.
 
 ## Deck compare flow
 

@@ -1,5 +1,7 @@
 import type { DeckCard } from "../backend";
 
+/** Display-only board labels; main/side semantics are enforced in Go (internal/cards/board.go). */
+
 export const BOARD_MAIN = "main";
 export const BOARD_SIDE = "side";
 

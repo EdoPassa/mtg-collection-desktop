@@ -5,11 +5,6 @@ import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
 import { isMainboard } from "../lib/deckBoard";
 
-const FORMAT_TARGETS = [
-  { id: "standard", label: "60-card", size: 60 },
-  { id: "commander", label: "100-card", size: 100 }
-] as const;
-
 const DRAW_PRESETS = [
   { id: "opening", label: "Opening hand", sampleSize: 7 },
   { id: "mulligan-6", label: "Mulligan to 6", sampleSize: 6 },
@@ -23,17 +18,25 @@ type Props = {
   setMessage: (message: string) => void;
   deck: Deck;
   cards: DeckCard[];
-  formatTarget: (typeof FORMAT_TARGETS)[number]["id"];
+  formatTarget: string;
+  formatTargetSize: number;
 };
 
-export function DeckAnalysisCalculators({ api, setMessage, deck, cards, formatTarget }: Props) {
+export function DeckAnalysisCalculators({
+  api,
+  setMessage,
+  deck,
+  cards,
+  formatTarget,
+  formatTargetSize
+}: Props) {
   const [landsInDeck, setLandsInDeck] = useState("");
   const [landsManual, setLandsManual] = useState(false);
   const [selectedOracleId, setSelectedOracleId] = useState("");
   const [sampleSize, setSampleSize] = useState(7);
   const [minCardCopies, setMinCardCopies] = useState(1);
   const [minLands, setMinLands] = useState(2);
-  const [genericN, setGenericN] = useState(60);
+  const [genericN, setGenericN] = useState(formatTargetSize);
   const [genericK, setGenericK] = useState(4);
   const [genericNsample, setGenericNsample] = useState(7);
   const [genericMinK, setGenericMinK] = useState(1);
@@ -57,8 +60,10 @@ export function DeckAnalysisCalculators({ api, setMessage, deck, cards, formatTa
   useEffect(() => {
     if (deckTotal > 0) {
       setGenericN(deckTotal);
+    } else {
+      setGenericN(formatTargetSize);
     }
-  }, [deckTotal]);
+  }, [deckTotal, formatTargetSize]);
 
   useEffect(() => {
     setLandsManual(false);

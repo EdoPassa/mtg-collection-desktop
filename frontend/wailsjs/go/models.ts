@@ -86,6 +86,22 @@ export namespace analysis {
 	        this.minLandsThreshold = source["minLandsThreshold"];
 	    }
 	}
+	export class FormatTarget {
+	    id: string;
+	    label: string;
+	    size: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new FormatTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.label = source["label"];
+	        this.size = source["size"];
+	    }
+	}
 	export class HypergeometricRequest {
 	    population: number;
 	    successesInPopulation: number;
@@ -397,9 +413,9 @@ export namespace collection {
 		}
 	}
 	export class BuildDeckInput {
-	    Name: string;
-	    ReplaceDeckID: number;
-	    Rows: DeckCompareRow[];
+	    name: string;
+	    replaceDeckId: number;
+	    rows: DeckCompareRow[];
 	
 	    static createFrom(source: any = {}) {
 	        return new BuildDeckInput(source);
@@ -407,9 +423,9 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Name = source["Name"];
-	        this.ReplaceDeckID = source["ReplaceDeckID"];
-	        this.Rows = this.convertValues(source["Rows"], DeckCompareRow);
+	        this.name = source["name"];
+	        this.replaceDeckId = source["replaceDeckId"];
+	        this.rows = this.convertValues(source["rows"], DeckCompareRow);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
