@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"sort"
+	"strings"
 
 	"mtgcollection/internal/cards"
 	"mtgcollection/internal/importer"
@@ -54,6 +55,16 @@ type ImportPreview struct {
 	Unresolved []string       `json:"unresolved"`
 }
 
+// ImportProgress reports validate/preview resolution progress to the UI.
+type ImportProgress struct {
+	Current int    `json:"current"`
+	Total   int    `json:"total"`
+	Label   string `json:"label"`
+}
+
+// ImportProgressReporter is called once per import line during preview.
+type ImportProgressReporter func(ImportProgress)
+
 type DeckCompareRow struct {
 	Board   string             `json:"board,omitempty"`
 	Card    cards.CardIdentity `json:"card"`
@@ -84,14 +95,14 @@ func New(store Store, cardResolver resolver.Resolver, oracleIndex resolver.BulkO
 	return &Service{store: store, resolver: cardResolver, oracleIndex: oracleIndex}
 }
 
-func (s *Service) PreviewTextImport(ctx context.Context, text string) (ImportPreview, error) {
+func (s *Service) PreviewTextImport(ctx context.Context, text string, report ImportProgressReporter) (ImportPreview, error) {
 	lines, unresolved := importer.ParseText(text)
-	return s.preview(ctx, lines, unresolved)
+	return s.preview(ctx, lines, unresolved, report)
 }
 
-func (s *Service) PreviewCSVImport(ctx context.Context, data []byte) (ImportPreview, error) {
+func (s *Service) PreviewCSVImport(ctx context.Context, data []byte, report ImportProgressReporter) (ImportPreview, error) {
 	lines, unresolved := importer.ParseCSVBytes(data)
-	return s.preview(ctx, lines, unresolved)
+	return s.preview(ctx, lines, unresolved, report)
 }
 
 func (s *Service) CommitImport(ctx context.Context, rows []ResolvedLine) error {
@@ -353,11 +364,12 @@ func (s *Service) ExportMissingCSV(writer io.Writer, rows []DeckCompareRow) erro
 	return csvWriter.Error()
 }
 
-func (s *Service) preview(ctx context.Context, lines []importer.ImportLine, unresolved []string) (ImportPreview, error) {
+func (s *Service) preview(ctx context.Context, lines []importer.ImportLine, unresolved []string, report ImportProgressReporter) (ImportPreview, error) {
 	var validated []ResolvedLine
+	total := len(lines)
 	// Avoid duplicate Scryfall lookups when the same card appears on multiple lines.
 	cache := map[string]resolver.Result{}
-	for _, line := range lines {
+	for i, line := range lines {
 		key := "name:" + line.Name
 		if line.ScryfallID != "" {
 			key = "id:" + line.ScryfallID
@@ -368,6 +380,9 @@ func (s *Service) preview(ctx context.Context, lines []importer.ImportLine, unre
 			result, err = s.resolver.ResolveLine(ctx, line)
 			if err != nil {
 				unresolved = append(unresolved, line.Raw+"  ->  "+err.Error())
+				if report != nil {
+					report(ImportProgress{Current: i + 1, Total: total, Label: importProgressLabel(line)})
+				}
 				continue
 			}
 			cache[key] = result
@@ -379,8 +394,18 @@ func (s *Service) preview(ctx context.Context, lines []importer.ImportLine, unre
 			ScryfallURI: result.Card.ScryfallURI,
 			Source:      result.Source,
 		})
+		if report != nil {
+			report(ImportProgress{Current: i + 1, Total: total, Label: importProgressLabel(line)})
+		}
 	}
 	return ImportPreview{Validated: nonNilSlice(validated), Unresolved: nonNilSlice(unresolved)}, nil
+}
+
+func importProgressLabel(line importer.ImportLine) string {
+	if strings.TrimSpace(line.Name) != "" {
+		return line.Name
+	}
+	return strings.TrimSpace(line.Raw)
 }
 
 func nonNilSlice[T any](items []T) []T {

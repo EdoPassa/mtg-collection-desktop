@@ -5,15 +5,26 @@ package app
 import (
 	"context"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"mtgcollection/internal/cards"
 	"mtgcollection/internal/collection"
 	"mtgcollection/internal/resolver"
 	"mtgcollection/internal/storage"
 )
 
+// ImportProgressEvent is emitted during PreviewTextImport / PreviewCSVImport validate.
+const ImportProgressEvent = "import:progress"
+
 type App struct {
+	ctx            context.Context
 	service        *collection.Service
 	resolverStatus string
+}
+
+// Startup stores the Wails context for runtime APIs such as EventsEmit.
+func (a *App) Startup(ctx context.Context) {
+	a.ctx = ctx
 }
 
 func New(store collection.Store, cardResolver resolver.Resolver, resolverStatus string, oracleIndex resolver.BulkOracleIndex) *App {
@@ -25,11 +36,18 @@ func (a *App) ResolverStatus() string {
 }
 
 func (a *App) PreviewTextImport(text string) (collection.ImportPreview, error) {
-	return a.service.PreviewTextImport(context.Background(), text)
+	return a.service.PreviewTextImport(context.Background(), text, a.emitImportProgress)
 }
 
 func (a *App) PreviewCSVImport(data []byte) (collection.ImportPreview, error) {
-	return a.service.PreviewCSVImport(context.Background(), data)
+	return a.service.PreviewCSVImport(context.Background(), data, a.emitImportProgress)
+}
+
+func (a *App) emitImportProgress(p collection.ImportProgress) {
+	if a.ctx == nil {
+		return
+	}
+	runtime.EventsEmit(a.ctx, ImportProgressEvent, p)
 }
 
 func (a *App) CommitImport(rows []collection.ResolvedLine) error {
