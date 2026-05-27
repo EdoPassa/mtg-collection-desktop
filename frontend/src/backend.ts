@@ -1,5 +1,5 @@
 import * as wailsApi from "../wailsjs/go/app/App";
-import type { cards, collection, storage } from "../wailsjs/go/models";
+import type { analysis, cards, collection, storage } from "../wailsjs/go/models";
 
 // Plain strips Go method stubs from Wails-generated model types for use in the frontend.
 type Plain<T> = T extends Array<infer U>
@@ -19,6 +19,14 @@ export type LendInput = Plain<storage.LendInput>;
 export type LentCard = Plain<cards.LentCard>;
 export type Deck = Plain<cards.Deck>;
 export type DeckCard = Plain<cards.DeckCard>;
+
+export type HypergeometricRequest = Plain<analysis.HypergeometricRequest>;
+export type HypergeometricResult = Plain<analysis.HypergeometricResult>;
+export type DeckDrawAnalysisRequest = Plain<analysis.DeckDrawAnalysisRequest>;
+export type DeckDrawAnalysisResult = Plain<analysis.DeckDrawAnalysisResult>;
+export type SimulationState = Plain<analysis.SimulationState>;
+export type SimulationCard = Plain<analysis.SimulationCard>;
+export type DrawStats = Plain<analysis.DrawStats>;
 
 export type WailsBindings = typeof wailsApi;
 
@@ -41,9 +49,24 @@ export type BackendApi = {
   ReturnCard(id: number, returnDate: string): Promise<void>;
   RepairCompareMismatches(repairs: RepairCandidate[]): Promise<void>;
   FormatMissingDecklist(rows: DeckCompareRow[]): Promise<string>;
+  Hypergeometric(req: HypergeometricRequest): Promise<HypergeometricResult>;
+  AnalyzeDeckDraw(req: DeckDrawAnalysisRequest): Promise<DeckDrawAnalysisResult>;
+  StartDeckSimulation(
+    deckID: number,
+    formatTarget: string,
+    oracleFocus: string,
+    minLands: number
+  ): Promise<SimulationState>;
+  SimNewOpening(sessionID: string): Promise<SimulationState>;
+  SimMulligan(sessionID: string): Promise<SimulationState>;
+  SimPutOnBottom(sessionID: string, slotID: string): Promise<SimulationState>;
+  SimDrawCard(sessionID: string): Promise<SimulationState>;
+  SimSetOracleFocus(sessionID: string, oracleID: string): Promise<SimulationState>;
+  EndDeckSimulation(sessionID: string): Promise<void>;
 };
 
-export function createBackendApi(bindings: WailsBindings = wailsApi): BackendApi {
+export function createBackendApi(overrides: Partial<WailsBindings> = {}): BackendApi {
+  const bindings = { ...wailsApi, ...overrides } as WailsBindings;
   return {
     ResolverStatus: bindings.ResolverStatus,
     ListCollection: () => bindings.ListCollection() as Promise<CollectionItem[]>,
@@ -62,6 +85,18 @@ export function createBackendApi(bindings: WailsBindings = wailsApi): BackendApi
     ListLentCards: (includeReturned) => bindings.ListLentCards(includeReturned) as Promise<LentCard[]>,
     ReturnCard: bindings.ReturnCard,
     RepairCompareMismatches: (repairs) => bindings.RepairCompareMismatches(repairs as collection.RepairCandidate[]),
-    FormatMissingDecklist: (rows) => bindings.FormatMissingDecklist(rows as collection.DeckCompareRow[])
+    FormatMissingDecklist: (rows) => bindings.FormatMissingDecklist(rows as collection.DeckCompareRow[]),
+    Hypergeometric: (req) => bindings.Hypergeometric(req as analysis.HypergeometricRequest) as Promise<HypergeometricResult>,
+    AnalyzeDeckDraw: (req) =>
+      bindings.AnalyzeDeckDraw(req as analysis.DeckDrawAnalysisRequest) as Promise<DeckDrawAnalysisResult>,
+    StartDeckSimulation: (deckID, formatTarget, oracleFocus, minLands) =>
+      bindings.StartDeckSimulation(deckID, formatTarget, oracleFocus, minLands) as Promise<SimulationState>,
+    SimNewOpening: (sessionID) => bindings.SimNewOpening(sessionID) as Promise<SimulationState>,
+    SimMulligan: (sessionID) => bindings.SimMulligan(sessionID) as Promise<SimulationState>,
+    SimPutOnBottom: (sessionID, slotID) => bindings.SimPutOnBottom(sessionID, slotID) as Promise<SimulationState>,
+    SimDrawCard: (sessionID) => bindings.SimDrawCard(sessionID) as Promise<SimulationState>,
+    SimSetOracleFocus: (sessionID, oracleID) =>
+      bindings.SimSetOracleFocus(sessionID, oracleID) as Promise<SimulationState>,
+    EndDeckSimulation: bindings.EndDeckSimulation
   };
 }

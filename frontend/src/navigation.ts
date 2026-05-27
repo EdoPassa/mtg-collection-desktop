@@ -55,7 +55,7 @@ export const navigation: NavEntry[] = [
         id: "deck-analysis",
         label: "Analysis",
         title: "Deck Analysis",
-        description: "Hypergeometric draw odds for cards and lands in a saved deck",
+        description: "Opening-hand simulator and server-side hypergeometric draw odds",
         icon: "◎"
       }
     ]

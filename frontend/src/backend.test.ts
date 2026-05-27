@@ -20,7 +20,48 @@ function fakeBindings(): WailsBindings {
     ListLentCards: vi.fn().mockResolvedValue([]),
     ReturnCard: vi.fn().mockResolvedValue(undefined),
     RepairCompareMismatches: vi.fn().mockResolvedValue(undefined),
-    FormatMissingDecklist: vi.fn().mockResolvedValue("")
+    FormatMissingDecklist: vi.fn().mockResolvedValue(""),
+    Hypergeometric: vi.fn().mockResolvedValue({ probability: 0.5, probabilityFormatted: "50.0%" }),
+    AnalyzeDeckDraw: vi.fn().mockResolvedValue({
+      populationN: 60,
+      deckTotal: 24,
+      targetSize: 60,
+      detectedLands: 20,
+      effectiveLandsK: 20,
+      effectiveSampleSize: 7,
+      cardProbability: 0.5,
+      cardProbabilityFormatted: "50.0%",
+      landProbability: 0.8,
+      landProbabilityFormatted: "80.0%"
+    }),
+    StartDeckSimulation: vi.fn().mockResolvedValue({
+      sessionId: "sim-1",
+      phase: "playing",
+      hand: [],
+      libraryCount: 53,
+      mulliganCount: 0,
+      canMulligan: true,
+      canDraw: true,
+      stats: {
+        landsInHand: 0,
+        libraryRemaining: 53,
+        nextDrawLandProb: 0.4,
+        nextDrawLandProbFormatted: "40.0%",
+        nextDrawCardProb: 0,
+        nextDrawCardProbFormatted: "0.0%",
+        afterOneDrawLandsProb: 0.5,
+        afterOneDrawLandsProbFormatted: "50.0%",
+        minLandsThreshold: 2
+      },
+      deckId: 1,
+      formatTarget: "standard"
+    }),
+    SimNewOpening: vi.fn(),
+    SimMulligan: vi.fn(),
+    SimPutOnBottom: vi.fn(),
+    SimDrawCard: vi.fn(),
+    SimSetOracleFocus: vi.fn(),
+    EndDeckSimulation: vi.fn().mockResolvedValue(undefined)
   };
 }
 

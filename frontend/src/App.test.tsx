@@ -26,7 +26,48 @@ function fakeApi(): BackendApi {
     ListLentCards: vi.fn().mockResolvedValue([]),
     ReturnCard: vi.fn().mockResolvedValue(undefined),
     RepairCompareMismatches: vi.fn().mockResolvedValue(undefined),
-    FormatMissingDecklist: vi.fn().mockResolvedValue("")
+    FormatMissingDecklist: vi.fn().mockResolvedValue(""),
+    Hypergeometric: vi.fn().mockResolvedValue({ probability: 0, probabilityFormatted: "0.0%" }),
+    AnalyzeDeckDraw: vi.fn().mockResolvedValue({
+      populationN: 60,
+      deckTotal: 0,
+      targetSize: 60,
+      detectedLands: 0,
+      effectiveLandsK: 0,
+      effectiveSampleSize: 7,
+      cardProbability: 0,
+      cardProbabilityFormatted: "—",
+      landProbability: 0,
+      landProbabilityFormatted: "—"
+    }),
+    StartDeckSimulation: vi.fn().mockResolvedValue({
+      sessionId: "sim-test",
+      phase: "playing",
+      hand: [],
+      libraryCount: 0,
+      mulliganCount: 0,
+      canMulligan: false,
+      canDraw: false,
+      stats: {
+        landsInHand: 0,
+        libraryRemaining: 0,
+        nextDrawLandProb: 0,
+        nextDrawLandProbFormatted: "—",
+        nextDrawCardProb: 0,
+        nextDrawCardProbFormatted: "—",
+        afterOneDrawLandsProb: 0,
+        afterOneDrawLandsProbFormatted: "—",
+        minLandsThreshold: 2
+      },
+      deckId: 0,
+      formatTarget: "standard"
+    }),
+    SimNewOpening: vi.fn(),
+    SimMulligan: vi.fn(),
+    SimPutOnBottom: vi.fn(),
+    SimDrawCard: vi.fn(),
+    SimSetOracleFocus: vi.fn(),
+    EndDeckSimulation: vi.fn().mockResolvedValue(undefined)
   };
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"mtgcollection/internal/analysis"
 	"mtgcollection/internal/cards"
 	"mtgcollection/internal/collection"
 	"mtgcollection/internal/resolver"
@@ -20,6 +21,7 @@ type App struct {
 	ctx            context.Context
 	service        *collection.Service
 	resolverStatus string
+	sessions       *analysis.SessionStore
 }
 
 // Startup stores the Wails context for runtime APIs such as EventsEmit.

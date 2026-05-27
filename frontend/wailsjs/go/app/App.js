@@ -6,6 +6,10 @@ export function AddCardToDeckByName(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddCardToDeckByName'](arg1, arg2, arg3);
 }
 
+export function AnalyzeDeckDraw(arg1) {
+  return window['go']['app']['App']['AnalyzeDeckDraw'](arg1);
+}
+
 export function BuildDeckFromCompare(arg1) {
   return window['go']['app']['App']['BuildDeckFromCompare'](arg1);
 }
@@ -22,8 +26,16 @@ export function DeleteDeck(arg1) {
   return window['go']['app']['App']['DeleteDeck'](arg1);
 }
 
+export function EndDeckSimulation(arg1) {
+  return window['go']['app']['App']['EndDeckSimulation'](arg1);
+}
+
 export function FormatMissingDecklist(arg1) {
   return window['go']['app']['App']['FormatMissingDecklist'](arg1);
+}
+
+export function Hypergeometric(arg1) {
+  return window['go']['app']['App']['Hypergeometric'](arg1);
 }
 
 export function LendCard(arg1) {
@@ -72,4 +84,28 @@ export function ReturnCard(arg1, arg2) {
 
 export function SetDeckCardQuantity(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SetDeckCardQuantity'](arg1, arg2, arg3, arg4);
+}
+
+export function SimDrawCard(arg1) {
+  return window['go']['app']['App']['SimDrawCard'](arg1);
+}
+
+export function SimMulligan(arg1) {
+  return window['go']['app']['App']['SimMulligan'](arg1);
+}
+
+export function SimNewOpening(arg1) {
+  return window['go']['app']['App']['SimNewOpening'](arg1);
+}
+
+export function SimPutOnBottom(arg1, arg2) {
+  return window['go']['app']['App']['SimPutOnBottom'](arg1, arg2);
+}
+
+export function SimSetOracleFocus(arg1, arg2) {
+  return window['go']['app']['App']['SimSetOracleFocus'](arg1, arg2);
+}
+
+export function StartDeckSimulation(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['StartDeckSimulation'](arg1, arg2, arg3, arg4);
 }
