@@ -111,7 +111,9 @@ li + li {
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -234,8 +236,19 @@ li + li {
 .app-main {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   padding: 1.75rem 2rem 2.5rem;
+}
+
+.app-main:has(> .collection-panel) {
+  overflow: hidden;
+}
+
+.app-main > .collection-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 .app-header {
@@ -1345,13 +1358,16 @@ label.analysis-field {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .collection-browser {
   display: grid;
+  flex: 1;
   gap: 1.25rem;
   grid-template-columns: minmax(220px, 280px) 1fr;
-  min-height: 320px;
+  min-height: 0;
 }
 
 .collection-browser-folders,
@@ -1359,7 +1375,66 @@ label.analysis-field {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
   min-width: 0;
+}
+
+.collection-browser-folders {
+  overflow: auto;
+}
+
+.collection-browser-detail {
+  overflow: hidden;
+}
+
+.collection-summary,
+.collection-toolbar {
+  flex-shrink: 0;
+}
+
+.collection-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.collection-scroll-region {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: rgba(125, 211, 252, 0.45) var(--bg-card);
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+}
+
+.collection-scroll-region:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.collection-scroll-region::-webkit-scrollbar {
+  height: 14px;
+  width: 14px;
+}
+
+.collection-scroll-region::-webkit-scrollbar-track {
+  background: var(--bg-card);
+}
+
+.collection-scroll-region::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(125, 211, 252, 0.55), rgba(99, 102, 241, 0.45));
+  border: 2px solid var(--bg-card);
+  border-radius: 999px;
+}
+
+.collection-scroll-region::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(186, 230, 253, 0.75), rgba(125, 211, 252, 0.55));
+}
+
+.collection-scroll-region::-webkit-scrollbar-corner {
+  background: var(--bg-card);
 }
 
 .collection-scope-label {
@@ -1578,39 +1653,6 @@ label.analysis-field {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   max-width: 100%;
-  overflow: auto;
-  scrollbar-color: rgba(125, 211, 252, 0.45) var(--bg-card);
-  scrollbar-gutter: stable;
-  scrollbar-width: auto;
-}
-
-.collection-table-wrap:focus-visible {
-  outline: 2px solid var(--accent-ring);
-  outline-offset: 2px;
-}
-
-.collection-table-wrap::-webkit-scrollbar {
-  height: 14px;
-  width: 14px;
-}
-
-.collection-table-wrap::-webkit-scrollbar-track {
-  background: var(--bg-card);
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-}
-
-.collection-table-wrap::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(125, 211, 252, 0.55), rgba(99, 102, 241, 0.45));
-  border: 2px solid var(--bg-card);
-  border-radius: 999px;
-}
-
-.collection-table-wrap::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(186, 230, 253, 0.75), rgba(125, 211, 252, 0.55));
-}
-
-.collection-table-wrap::-webkit-scrollbar-corner {
-  background: var(--bg-card);
 }
 
 .collection-table {
@@ -1627,9 +1669,11 @@ label.analysis-field {
 }
 
 .collection-table thead th {
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid var(--border);
-  color: var(--text-dim);
+  background: var(--bg-panel);
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: var(--text-muted);
   font: inherit;
   font-size: 0.7rem;
   font-weight: 600;
@@ -1640,7 +1684,7 @@ label.analysis-field {
   text-align: left;
   text-transform: uppercase;
   top: 0;
-  z-index: 1;
+  z-index: 2;
 }
 
 .collection-th-label {
@@ -1746,9 +1790,13 @@ body.col-resize-active * {
 }
 
 .collection-gallery {
+  align-content: start;
   display: grid;
   gap: 1rem;
+  grid-auto-rows: auto;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  padding: 0.15rem;
+  width: 100%;
 }
 
 .gallery-card {
@@ -1770,8 +1818,11 @@ body.col-resize-active * {
 }
 
 .gallery-card .card-image {
+  display: block;
+  flex-shrink: 0;
   margin: -0.1rem auto 0.25rem;
   max-width: 100%;
+  width: 100%;
 }
 
 .gallery-card-body {

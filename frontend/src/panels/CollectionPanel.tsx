@@ -458,6 +458,7 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
             </button>
           </div>
 
+          <div className="collection-body">
           {filtered.length === 0 ? (
             <EmptyState
               title="No cards found."
@@ -508,6 +509,7 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
               onCreateTag={handleCreateTag}
             />
           )}
+          </div>
         </div>
       </div>
 
@@ -730,7 +732,11 @@ function CollectionTable({
   );
 
   return (
-    <div className="collection-table-wrap" tabIndex={0} aria-label="Collection table, scroll horizontally to see more columns">
+    <div
+      className="collection-scroll-region collection-table-wrap"
+      tabIndex={0}
+      aria-label="Collection table, scroll to see more rows and columns"
+    >
       <table className="collection-table collection-table--resizable" style={{ minWidth: tableMinWidth }}>
         <colgroup>
           {headerColumns.map((column) => (
@@ -851,7 +857,8 @@ function CollectionGallery({
   onCreateTag
 }: CollectionViewProps) {
   return (
-    <div className="collection-gallery">
+    <div className="collection-scroll-region">
+      <div className="collection-gallery">
       {rows.map((row) => (
         <article key={row.card.oracleId} className="gallery-card">
           <CardImage
@@ -925,6 +932,7 @@ function CollectionGallery({
           </div>
         </article>
       ))}
+      </div>
     </div>
   );
 }
