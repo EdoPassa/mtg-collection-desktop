@@ -91,22 +91,39 @@ export function DeckAnalysisSimulator({
       void endSession(sessionRef.current);
       sessionRef.current = undefined;
     };
-  }, [api, deckId, endSession, formatTarget, selectedOracleId, setMessage]);
+    // Oracle focus changes are handled separately; restarting here races with SimSetOracleFocus.
+  }, [api, deckId, endSession, formatTarget, setMessage]);
 
   useEffect(() => {
-    if (!sim?.sessionId || selectedOracleId === sim.stats.oracleIdUsed) {
+    const sessionId = sim?.sessionId;
+    if (!sessionId || selectedOracleId === sim.stats.oracleIdUsed) {
       return;
     }
+    if (sessionRef.current !== sessionId) {
+      return;
+    }
+    let cancelled = false;
     void (async () => {
       try {
-        const next = await api.SimSetOracleFocus(sim.sessionId, selectedOracleId);
-        if (next) {
-          setSim(next);
+        const next = await api.SimSetOracleFocus(sessionId, selectedOracleId);
+        if (cancelled || sessionRef.current !== sessionId) {
+          return;
         }
+        setSim(next);
       } catch (error) {
-        setMessage(String(error));
+        if (cancelled || sessionRef.current !== sessionId) {
+          return;
+        }
+        const message = String(error);
+        if (message.includes("simulation session not found")) {
+          return;
+        }
+        setMessage(message);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [api, selectedOracleId, setMessage, sim?.sessionId, sim?.stats.oracleIdUsed]);
 
   async function runAction(action: () => Promise<SimulationState>) {

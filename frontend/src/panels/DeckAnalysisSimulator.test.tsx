@@ -5,6 +5,32 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFakeBackendTestKit } from "../test/fakeBackend";
 import { DeckAnalysisSimulator } from "./DeckAnalysisSimulator";
 
+function makeSimState(sessionId: string, oracleIdUsed = "") {
+  return {
+    sessionId,
+    phase: "playing" as const,
+    hand: [{ slotId: "s1", oracleId: "oracle-bolt", name: "Lightning Bolt", isLand: false }],
+    libraryCount: 53,
+    mulliganCount: 0,
+    canMulligan: true,
+    canDraw: true,
+    stats: {
+      landsInHand: 0,
+      libraryRemaining: 53,
+      nextDrawLandProb: 0.4,
+      nextDrawLandProbFormatted: "40.0%",
+      nextDrawCardProb: 0.07,
+      nextDrawCardProbFormatted: "7.0%",
+      oracleIdUsed,
+      afterOneDrawLandsProb: 0.5,
+      afterOneDrawLandsProbFormatted: "50.0%",
+      minLandsThreshold: 2
+    },
+    deckId: 1,
+    formatTarget: "standard"
+  };
+}
+
 afterEach(() => cleanup());
 
 const mainboard = [
@@ -20,6 +46,44 @@ const mainboard = [
 ];
 
 describe("DeckAnalysisSimulator", () => {
+  it("updates oracle focus without restarting the session when selectedOracleId arrives later", async () => {
+    const setMessage = vi.fn();
+    const { api, bindings } = createFakeBackendTestKit({
+      StartDeckSimulation: vi.fn().mockResolvedValue(makeSimState("sim-1")),
+      SimSetOracleFocus: vi.fn().mockResolvedValue(makeSimState("sim-1", "oracle-bolt"))
+    });
+    const { rerender } = render(
+      <DeckAnalysisSimulator
+        api={api}
+        setMessage={setMessage}
+        deckId={1}
+        formatTarget="standard"
+        mainboardCards={mainboard}
+        selectedOracleId=""
+        onOracleChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(bindings.StartDeckSimulation).toHaveBeenCalledTimes(1));
+    await screen.findByText(/P\(next card is a land\)/);
+
+    rerender(
+      <DeckAnalysisSimulator
+        api={api}
+        setMessage={setMessage}
+        deckId={1}
+        formatTarget="standard"
+        mainboardCards={mainboard}
+        selectedOracleId="oracle-bolt"
+        onOracleChange={vi.fn()}
+      />
+    );
+
+    await waitFor(() => expect(bindings.SimSetOracleFocus).toHaveBeenCalledWith("sim-1", "oracle-bolt"));
+    expect(bindings.StartDeckSimulation).toHaveBeenCalledTimes(1);
+    expect(setMessage).not.toHaveBeenCalledWith("simulation session not found");
+  });
+
   it("puts a card on bottom when awaiting bottom phase", async () => {
     const { api, bindings } = createFakeBackendTestKit({
       StartDeckSimulation: vi.fn().mockResolvedValue({
