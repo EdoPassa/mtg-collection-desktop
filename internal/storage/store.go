@@ -99,7 +99,10 @@ func (s *Store) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, schemaSQL); err != nil {
 		return err
 	}
-	return s.migrateDeckBoardColumn(ctx)
+	if err := s.migrateDeckBoardColumn(ctx); err != nil {
+		return err
+	}
+	return s.migrateCollectionFolders(ctx)
 }
 
 func (s *Store) migrateDeckBoardColumn(ctx context.Context) error {

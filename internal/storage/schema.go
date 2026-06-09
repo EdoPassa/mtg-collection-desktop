@@ -54,6 +54,26 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
+INSERT OR IGNORE INTO schema_migrations(version) VALUES (3);
+`
+
+const migrateV3SQL = `
+CREATE TABLE collection_folders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  parent_id INTEGER REFERENCES collection_folders(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (parent_id, name)
+);
+
+CREATE TABLE collection_folder_items (
+  folder_id INTEGER NOT NULL REFERENCES collection_folders(id) ON DELETE CASCADE,
+  oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  PRIMARY KEY (folder_id, oracle_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_folder_items_oracle ON collection_folder_items(oracle_id);
 `
 
 const migrateV2SQL = `

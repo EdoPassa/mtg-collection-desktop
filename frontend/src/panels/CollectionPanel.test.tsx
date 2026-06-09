@@ -62,6 +62,13 @@ function panelApi(rows: CollectionItem[]): BackendApi {
   return {
     ResolverStatus: vi.fn().mockResolvedValue("bulk-first"),
     ListCollection: vi.fn().mockResolvedValue(rows),
+    ListCollectionFolders: vi.fn().mockResolvedValue([]),
+    CreateCollectionFolder: vi.fn().mockResolvedValue(1),
+    RenameCollectionFolder: vi.fn(),
+    MoveCollectionFolder: vi.fn(),
+    DeleteCollectionFolder: vi.fn(),
+    ListCollectionInFolder: vi.fn().mockResolvedValue([]),
+    MoveCollectionCopies: vi.fn(),
     PreviewTextImport: vi.fn(),
     PreviewCSVImport: vi.fn(),
     CommitImport: vi.fn(),
@@ -139,5 +146,17 @@ describe("CollectionPanel", () => {
     await screen.findByText("Lightning Bolt", { selector: "strong" });
     await userEvent.type(screen.getByLabelText("Search collection"), "Llanowar Elves");
     expect(await screen.findByText("No cards found.")).toBeInTheDocument();
+  });
+
+  it("renders folder navigation and switches to unsorted scope", async () => {
+    const api = panelApi(sampleRows());
+    render(<CollectionPanel api={api} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    expect(screen.getByRole("button", { name: "All cards" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unsorted" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Unsorted" }));
+    expect(api.ListCollectionInFolder).toHaveBeenCalledWith(0);
   });
 });

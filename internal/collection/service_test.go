@@ -449,3 +449,58 @@ func TestListCollectionWithoutBulkIndexLeavesEnrichmentFieldsEmpty(t *testing.T)
 		t.Fatalf("API-only enrichment leaked: %#v", got)
 	}
 }
+
+func TestCollectionFolderWorkflow(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CommitImport(t.Context(), preview.Validated); err != nil {
+		t.Fatal(err)
+	}
+
+	folderID, err := service.CreateCollectionFolder(t.Context(), nil, "Trade Binder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oracleID := preview.Validated[0].OracleID
+	if err := service.MoveCollectionCopies(t.Context(), oracleID, UnsortedFolderID, folderID, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	allRows, err := service.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allRows[0].Quantity != 4 || allRows[0].AllocatedQty != 2 || allRows[0].UnassignedQty != 2 {
+		t.Fatalf("all collection = %#v, want qty 4 allocated 2 unassigned 2", allRows[0])
+	}
+
+	folderRows, err := service.ListCollectionInFolder(t.Context(), folderID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folderRows) != 1 || folderRows[0].Quantity != 2 {
+		t.Fatalf("folder rows = %#v, want one row qty 2", folderRows)
+	}
+
+	unsortedRows, err := service.ListCollectionInFolder(t.Context(), UnsortedFolderID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unsortedRows) != 1 || unsortedRows[0].Quantity != 2 {
+		t.Fatalf("unsorted rows = %#v, want one row qty 2", unsortedRows)
+	}
+
+	folders, err := service.ListCollectionFolders(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folders == nil {
+		t.Fatal("ListCollectionFolders returned nil, want empty slice")
+	}
+	if len(folders) != 1 || folders[0].Name != "Trade Binder" {
+		t.Fatalf("folders = %#v, want Trade Binder", folders)
+	}
+}

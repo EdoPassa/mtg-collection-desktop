@@ -111,3 +111,31 @@ func (a *App) ListLentCards(includeReturned bool) ([]cards.LentCard, error) {
 func (a *App) FormatMissingDecklist(rows []collection.DeckCompareRow) string {
 	return collection.FormatMissingDecklist(rows)
 }
+
+func (a *App) ListCollectionFolders() ([]cards.CollectionFolder, error) {
+	return a.service.ListCollectionFolders(context.Background())
+}
+
+func (a *App) CreateCollectionFolder(parentID *int64, name string) (int64, error) {
+	return a.service.CreateCollectionFolder(context.Background(), parentID, name)
+}
+
+func (a *App) RenameCollectionFolder(folderID int64, name string) error {
+	return a.service.RenameCollectionFolder(context.Background(), folderID, name)
+}
+
+func (a *App) MoveCollectionFolder(folderID int64, newParentID *int64) error {
+	return a.service.MoveCollectionFolder(context.Background(), folderID, newParentID)
+}
+
+func (a *App) DeleteCollectionFolder(folderID int64) error {
+	return a.service.DeleteCollectionFolder(context.Background(), folderID)
+}
+
+func (a *App) ListCollectionInFolder(folderID int64) ([]cards.FolderCard, error) {
+	return a.service.ListCollectionInFolder(context.Background(), folderID)
+}
+
+func (a *App) MoveCollectionCopies(oracleID string, fromFolderID, toFolderID int64, quantity int) error {
+	return a.service.MoveCollectionCopies(context.Background(), oracleID, fromFolderID, toFolderID, quantity)
+}

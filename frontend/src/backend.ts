@@ -20,6 +20,11 @@ export type LendInput = Plain<storage.LendInput>;
 export type LentCard = Plain<cards.LentCard>;
 export type Deck = Plain<cards.Deck>;
 export type DeckCard = Plain<cards.DeckCard>;
+export type CollectionFolder = Plain<cards.CollectionFolder>;
+export type FolderCard = Plain<cards.FolderCard>;
+
+/** Sentinel folder ID for unallocated copies (not a DB row). */
+export const UnsortedFolderID = 0;
 
 export type FormatTarget = Plain<analysis.FormatTarget>;
 export type HypergeometricRequest = Plain<analysis.HypergeometricRequest>;
@@ -39,6 +44,13 @@ export type BackendApi = {
   ResolverStatus(): Promise<string>;
   ListFormatTargets(): Promise<FormatTarget[]>;
   ListCollection(): Promise<CollectionItem[]>;
+  ListCollectionFolders(): Promise<CollectionFolder[]>;
+  CreateCollectionFolder(parentID: number | null, name: string): Promise<number>;
+  RenameCollectionFolder(folderID: number, name: string): Promise<void>;
+  MoveCollectionFolder(folderID: number, newParentID: number | null): Promise<void>;
+  DeleteCollectionFolder(folderID: number): Promise<void>;
+  ListCollectionInFolder(folderID: number): Promise<FolderCard[]>;
+  MoveCollectionCopies(oracleID: string, fromFolderID: number, toFolderID: number, quantity: number): Promise<void>;
   PreviewTextImport(text: string): Promise<ImportPreview>;
   PreviewCSVImport(data: number[]): Promise<ImportPreview>;
   CommitImport(rows: ResolvedLine[]): Promise<void>;
@@ -97,6 +109,13 @@ export function createBackendApi(overrides: Partial<WailsBindings> = {}): Backen
     ResolverStatus: bindings.ResolverStatus,
     ListFormatTargets: () => bindings.ListFormatTargets() as Promise<FormatTarget[]>,
     ListCollection: () => bindings.ListCollection() as Promise<CollectionItem[]>,
+    ListCollectionFolders: () => bindings.ListCollectionFolders() as Promise<CollectionFolder[]>,
+    CreateCollectionFolder: (parentID, name) => bindings.CreateCollectionFolder(parentID, name),
+    RenameCollectionFolder: bindings.RenameCollectionFolder,
+    MoveCollectionFolder: (folderID, newParentID) => bindings.MoveCollectionFolder(folderID, newParentID),
+    DeleteCollectionFolder: bindings.DeleteCollectionFolder,
+    ListCollectionInFolder: (folderID) => bindings.ListCollectionInFolder(folderID) as Promise<FolderCard[]>,
+    MoveCollectionCopies: bindings.MoveCollectionCopies,
     PreviewTextImport: (text) => bindings.PreviewTextImport(text) as Promise<ImportPreview>,
     PreviewCSVImport: (data) => bindings.PreviewCSVImport(data) as Promise<ImportPreview>,
     CommitImport: (rows) => bindings.CommitImport(rows as collection.ResolvedLine[]),

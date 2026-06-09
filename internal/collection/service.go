@@ -34,6 +34,15 @@ type Store interface {
 	ReturnCard(ctx context.Context, lentID int64, returnDate string) error
 	ListLentCards(ctx context.Context, includeReturned bool) ([]cards.LentCard, error)
 	GetLentSummaryByOracleID(ctx context.Context) (map[string]storage.LentSummary, error)
+	CreateFolder(ctx context.Context, parentID *int64, name string) (int64, error)
+	ListFolders(ctx context.Context) ([]cards.CollectionFolder, error)
+	RenameFolder(ctx context.Context, folderID int64, name string) error
+	MoveFolder(ctx context.Context, folderID int64, newParentID *int64) error
+	DeleteFolder(ctx context.Context, folderID int64) error
+	ListFolderCards(ctx context.Context, folderID int64) ([]cards.FolderCard, error)
+	ListUnsortedCards(ctx context.Context) ([]cards.FolderCard, error)
+	GetAllocatedByOracleID(ctx context.Context) (map[string]int, error)
+	MoveCopies(ctx context.Context, oracleID string, fromFolderID, toFolderID int64, qty int) error
 }
 
 type Service struct {
@@ -131,12 +140,21 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 	if err != nil {
 		return nil, err
 	}
+	allocated, err := s.store.GetAllocatedByOracleID(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for i := range rows {
 		summary := lent[rows[i].Card.OracleID]
 		rows[i].LentQty = summary.TotalQuantity
 		rows[i].Available = rows[i].Quantity - rows[i].LentQty
 		if rows[i].Available < 0 {
 			rows[i].Available = 0
+		}
+		rows[i].AllocatedQty = allocated[rows[i].Card.OracleID]
+		rows[i].UnassignedQty = rows[i].Quantity - rows[i].AllocatedQty
+		if rows[i].UnassignedQty < 0 {
+			rows[i].UnassignedQty = 0
 		}
 		s.enrichCardFromBulk(&rows[i].Card)
 	}

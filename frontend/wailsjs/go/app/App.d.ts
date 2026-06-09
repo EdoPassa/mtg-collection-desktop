@@ -15,6 +15,10 @@ export function CommitImport(arg1:Array<collection.ResolvedLine>):Promise<void>;
 
 export function CompareDeck(arg1:string):Promise<collection.DeckCompareResult>;
 
+export function CreateCollectionFolder(arg1:any,arg2:string):Promise<number>;
+
+export function DeleteCollectionFolder(arg1:number):Promise<void>;
+
 export function DeleteDeck(arg1:number):Promise<void>;
 
 export function EndDeckSimulation(arg1:string):Promise<void>;
@@ -27,6 +31,10 @@ export function LendCard(arg1:storage.LendInput):Promise<void>;
 
 export function ListCollection():Promise<Array<cards.CollectionItem>>;
 
+export function ListCollectionFolders():Promise<Array<cards.CollectionFolder>>;
+
+export function ListCollectionInFolder(arg1:number):Promise<Array<cards.FolderCard>>;
+
 export function ListDeckCards(arg1:number):Promise<Array<cards.DeckCard>>;
 
 export function ListDecks():Promise<Array<cards.Deck>>;
@@ -35,9 +43,15 @@ export function ListFormatTargets():Promise<Array<analysis.FormatTarget>>;
 
 export function ListLentCards(arg1:boolean):Promise<Array<cards.LentCard>>;
 
+export function MoveCollectionCopies(arg1:string,arg2:number,arg3:number,arg4:number):Promise<void>;
+
+export function MoveCollectionFolder(arg1:number,arg2:any):Promise<void>;
+
 export function PreviewCSVImport(arg1:Array<number>):Promise<collection.ImportPreview>;
 
 export function PreviewTextImport(arg1:string):Promise<collection.ImportPreview>;
+
+export function RenameCollectionFolder(arg1:number,arg2:string):Promise<void>;
 
 export function RenameDeck(arg1:number,arg2:string):Promise<void>;
 

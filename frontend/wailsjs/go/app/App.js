@@ -22,6 +22,14 @@ export function CompareDeck(arg1) {
   return window['go']['app']['App']['CompareDeck'](arg1);
 }
 
+export function CreateCollectionFolder(arg1, arg2) {
+  return window['go']['app']['App']['CreateCollectionFolder'](arg1, arg2);
+}
+
+export function DeleteCollectionFolder(arg1) {
+  return window['go']['app']['App']['DeleteCollectionFolder'](arg1);
+}
+
 export function DeleteDeck(arg1) {
   return window['go']['app']['App']['DeleteDeck'](arg1);
 }
@@ -46,6 +54,14 @@ export function ListCollection() {
   return window['go']['app']['App']['ListCollection']();
 }
 
+export function ListCollectionFolders() {
+  return window['go']['app']['App']['ListCollectionFolders']();
+}
+
+export function ListCollectionInFolder(arg1) {
+  return window['go']['app']['App']['ListCollectionInFolder'](arg1);
+}
+
 export function ListDeckCards(arg1) {
   return window['go']['app']['App']['ListDeckCards'](arg1);
 }
@@ -62,12 +78,24 @@ export function ListLentCards(arg1) {
   return window['go']['app']['App']['ListLentCards'](arg1);
 }
 
+export function MoveCollectionCopies(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['MoveCollectionCopies'](arg1, arg2, arg3, arg4);
+}
+
+export function MoveCollectionFolder(arg1, arg2) {
+  return window['go']['app']['App']['MoveCollectionFolder'](arg1, arg2);
+}
+
 export function PreviewCSVImport(arg1) {
   return window['go']['app']['App']['PreviewCSVImport'](arg1);
 }
 
 export function PreviewTextImport(arg1) {
   return window['go']['app']['App']['PreviewTextImport'](arg1);
+}
+
+export function RenameCollectionFolder(arg1, arg2) {
+  return window['go']['app']['App']['RenameCollectionFolder'](arg1, arg2);
 }
 
 export function RenameDeck(arg1, arg2) {

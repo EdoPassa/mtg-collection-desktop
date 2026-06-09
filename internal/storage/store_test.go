@@ -266,6 +266,134 @@ func TestListLentCardsReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 	}
 }
 
+func TestFolderWorkflow(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	card := cards.CardIdentity{OracleID: "oracle-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{card}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), card.OracleID, 4); err != nil {
+		t.Fatal(err)
+	}
+
+	boxID, err := store.CreateFolder(t.Context(), nil, "Boxes")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tradeID, err := store.CreateFolder(t.Context(), &boxID, "Trade Binder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MoveCopies(t.Context(), card.OracleID, UnsortedFolderID, tradeID, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	tradeCards, err := store.ListFolderCards(t.Context(), tradeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tradeCards) != 1 || tradeCards[0].Quantity != 2 {
+		t.Fatalf("trade folder cards = %#v, want one row qty 2", tradeCards)
+	}
+
+	unsorted, err := store.ListUnsortedCards(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unsorted) != 1 || unsorted[0].Quantity != 2 {
+		t.Fatalf("unsorted cards = %#v, want one row qty 2", unsorted)
+	}
+
+	if err := store.MoveCopies(t.Context(), card.OracleID, tradeID, UnsortedFolderID, 1); err != nil {
+		t.Fatal(err)
+	}
+	unsorted, err = store.ListUnsortedCards(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unsorted) != 1 || unsorted[0].Quantity != 3 {
+		t.Fatalf("unsorted after move back = %#v, want qty 3", unsorted)
+	}
+}
+
+func TestDeleteFolderReallocatesToUnsorted(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	card := cards.CardIdentity{OracleID: "oracle-opt", Name: "Opt", ScryfallURI: "https://example.test/opt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{card}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), card.OracleID, 3); err != nil {
+		t.Fatal(err)
+	}
+
+	parentID, err := store.CreateFolder(t.Context(), nil, "Parent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	childID, err := store.CreateFolder(t.Context(), &parentID, "Child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MoveCopies(t.Context(), card.OracleID, UnsortedFolderID, childID, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteFolder(t.Context(), parentID); err != nil {
+		t.Fatal(err)
+	}
+
+	unsorted, err := store.ListUnsortedCards(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unsorted) != 1 || unsorted[0].Quantity != 3 {
+		t.Fatalf("unsorted after delete = %#v, want all 3 copies unassigned", unsorted)
+	}
+	folders, err := store.ListFolders(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folders) != 0 {
+		t.Fatalf("folders after delete = %#v, want empty", folders)
+	}
+}
+
+func TestMoveFolderRejectsCycles(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	rootID, err := store.CreateFolder(t.Context(), nil, "Root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	childID, err := store.CreateFolder(t.Context(), &rootID, "Child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MoveFolder(t.Context(), rootID, &childID); err == nil {
+		t.Fatal("MoveFolder should reject moving folder into its descendant")
+	}
+}
+
+func TestListFoldersReturnsEmptySliceForEmptyDatabase(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	folders, err := store.ListFolders(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folders == nil {
+		t.Fatal("ListFolders returned nil, want empty slice")
+	}
+	if len(folders) != 0 {
+		t.Fatalf("folders = %#v, want empty", folders)
+	}
+}
+
 func openTestStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := Open(filepath.Join(t.TempDir(), "collection.sqlite3"))

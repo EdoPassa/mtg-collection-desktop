@@ -12,11 +12,33 @@ type CardIdentity struct {
 }
 
 type CollectionItem struct {
+	Card          CardIdentity `json:"card"`
+	Quantity      int          `json:"quantity"`
+	LentQty       int          `json:"lentQty"`
+	InDeck        bool         `json:"inDeck"`
+	Available     int          `json:"available"`
+	AllocatedQty  int          `json:"allocatedQty,omitempty"`
+	UnassignedQty int          `json:"unassignedQty,omitempty"`
+}
+
+type CollectionFolder struct {
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	ParentID *int64 `json:"parentId,omitempty"`
+}
+
+type FolderCard struct {
 	Card      CardIdentity `json:"card"`
 	Quantity  int          `json:"quantity"`
-	LentQty   int          `json:"lentQty"`
-	InDeck    bool         `json:"inDeck"`
-	Available int          `json:"available"`
+	LentQty   int          `json:"lentQty,omitempty"`
+	InDeck    bool         `json:"inDeck,omitempty"`
+	Available int          `json:"available,omitempty"`
+}
+
+type FolderAllocation struct {
+	FolderID   int64  `json:"folderId"`
+	FolderName string `json:"folderName"`
+	Quantity   int    `json:"quantity"`
 }
 
 type Deck struct {
