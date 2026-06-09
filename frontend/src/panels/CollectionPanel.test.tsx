@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { BackendApi, CollectionItem } from "../backend";
+import type { BackendApi, CollectionItem, CollectionTag } from "../backend";
 import { CollectionPanel } from "./CollectionPanel";
 
 afterEach(() => cleanup());
@@ -23,7 +23,8 @@ function sampleRows(): CollectionItem[] {
       quantity: 4,
       lentQty: 1,
       available: 3,
-      inDeck: true
+      inDeck: true,
+      tags: [{ id: 1, name: "Trade" }, { id: 2, name: "Foil" }]
     },
     {
       card: {
@@ -58,7 +59,13 @@ function sampleRows(): CollectionItem[] {
   ];
 }
 
-function panelApi(rows: CollectionItem[]): BackendApi {
+const sampleTags: CollectionTag[] = [
+  { id: 1, name: "Trade", cardCount: 1 },
+  { id: 2, name: "Foil", cardCount: 1 },
+  { id: 3, name: "Reserved", cardCount: 0 }
+];
+
+function panelApi(rows: CollectionItem[], tags: CollectionTag[] = sampleTags): BackendApi {
   return {
     ResolverStatus: vi.fn().mockResolvedValue("bulk-first"),
     ListCollection: vi.fn().mockResolvedValue(rows),
@@ -69,6 +76,12 @@ function panelApi(rows: CollectionItem[]): BackendApi {
     DeleteCollectionFolder: vi.fn(),
     ListCollectionInFolder: vi.fn().mockResolvedValue([]),
     MoveCollectionCopies: vi.fn(),
+    ListCollectionTags: vi.fn().mockResolvedValue(tags),
+    CreateCollectionTag: vi.fn().mockResolvedValue(4),
+    RenameCollectionTag: vi.fn(),
+    UpdateCollectionTagColor: vi.fn(),
+    DeleteCollectionTag: vi.fn(),
+    SetCardTags: vi.fn(),
     PreviewTextImport: vi.fn(),
     PreviewCSVImport: vi.fn(),
     CommitImport: vi.fn(),
@@ -158,5 +171,38 @@ describe("CollectionPanel", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Unsorted" }));
     expect(api.ListCollectionInFolder).toHaveBeenCalledWith(0);
+  });
+
+  it("renders tag badges and filters with AND semantics across selected tags", async () => {
+    render(<CollectionPanel api={panelApi(sampleRows())} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    const tagFilter = screen.getByRole("group", { name: "Filter by tag" });
+    expect(within(tagFilter).getByRole("button", { name: "Trade" })).toBeInTheDocument();
+    expect(within(tagFilter).getByRole("button", { name: "Foil" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Trade" }).length).toBeGreaterThan(1);
+
+    await userEvent.click(within(tagFilter).getByRole("button", { name: "Trade" }));
+    expect(screen.getByText("Lightning Bolt", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.queryByText("Counterspell", { selector: "strong" })).not.toBeInTheDocument();
+
+    await userEvent.click(within(tagFilter).getByRole("button", { name: "Foil" }));
+    expect(screen.getByText("Lightning Bolt", { selector: "strong" })).toBeInTheDocument();
+
+    await userEvent.click(within(tagFilter).getByRole("button", { name: "Reserved" }));
+    expect(screen.queryByText("Lightning Bolt", { selector: "strong" })).not.toBeInTheDocument();
+    expect(screen.getByText("No cards found.")).toBeInTheDocument();
+  });
+
+  it("saves card tags from the row editor", async () => {
+    const api = panelApi(sampleRows());
+    render(<CollectionPanel api={api} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    await userEvent.click(screen.getAllByRole("button", { name: "Edit" })[0]);
+    await userEvent.click(screen.getByRole("checkbox", { name: "Trade" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(api.SetCardTags).toHaveBeenCalledWith("oracle-bolt", [2]);
   });
 });

@@ -102,7 +102,10 @@ func (s *Store) migrate(ctx context.Context) error {
 	if err := s.migrateDeckBoardColumn(ctx); err != nil {
 		return err
 	}
-	return s.migrateCollectionFolders(ctx)
+	if err := s.migrateCollectionFolders(ctx); err != nil {
+		return err
+	}
+	return s.migrateCollectionTags(ctx)
 }
 
 func (s *Store) migrateDeckBoardColumn(ctx context.Context) error {

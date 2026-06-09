@@ -504,3 +504,50 @@ func TestCollectionFolderWorkflow(t *testing.T) {
 		t.Fatalf("folders = %#v, want Trade Binder", folders)
 	}
 }
+
+func TestCollectionTagsOnListResponses(t *testing.T) {
+	service := newTestService(t)
+	preview, err := service.PreviewTextImport(t.Context(), "4 Lightning Bolt\n", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CommitImport(t.Context(), preview.Validated); err != nil {
+		t.Fatal(err)
+	}
+
+	tradeID, err := service.CreateCollectionTag(t.Context(), "Trade", "#3b82f6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oracleID := preview.Validated[0].OracleID
+	if err := service.SetCardTags(t.Context(), oracleID, []int64{tradeID}); err != nil {
+		t.Fatal(err)
+	}
+
+	allRows, err := service.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allRows[0].Tags) != 1 || allRows[0].Tags[0].Name != "Trade" {
+		t.Fatalf("collection tags = %#v, want Trade", allRows[0].Tags)
+	}
+
+	folderRows, err := service.ListCollectionInFolder(t.Context(), UnsortedFolderID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folderRows[0].Tags) != 1 || folderRows[0].Tags[0].ID != tradeID {
+		t.Fatalf("folder tags = %#v, want trade tag", folderRows[0].Tags)
+	}
+
+	tags, err := service.ListCollectionTags(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tags == nil {
+		t.Fatal("ListCollectionTags returned nil, want empty slice")
+	}
+	if len(tags) != 1 || tags[0].CardCount != 1 {
+		t.Fatalf("tags = %#v, want one tag with count 1", tags)
+	}
+}

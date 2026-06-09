@@ -43,6 +43,13 @@ type Store interface {
 	ListUnsortedCards(ctx context.Context) ([]cards.FolderCard, error)
 	GetAllocatedByOracleID(ctx context.Context) (map[string]int, error)
 	MoveCopies(ctx context.Context, oracleID string, fromFolderID, toFolderID int64, qty int) error
+	CreateTag(ctx context.Context, name, color string) (int64, error)
+	ListTags(ctx context.Context) ([]cards.CollectionTag, error)
+	RenameTag(ctx context.Context, tagID int64, name string) error
+	UpdateTagColor(ctx context.Context, tagID int64, color string) error
+	DeleteTag(ctx context.Context, tagID int64) error
+	GetTagsByOracleID(ctx context.Context) (map[string][]cards.CollectionTag, error)
+	SetCardTags(ctx context.Context, oracleID string, tagIDs []int64) error
 }
 
 type Service struct {
@@ -157,6 +164,9 @@ func (s *Service) ListCollection(ctx context.Context) ([]cards.CollectionItem, e
 			rows[i].UnassignedQty = 0
 		}
 		s.enrichCardFromBulk(&rows[i].Card)
+	}
+	if err := s.attachTagsToCollectionItems(ctx, rows); err != nil {
+		return nil, err
 	}
 	return rows, nil
 }

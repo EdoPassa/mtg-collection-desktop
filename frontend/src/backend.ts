@@ -22,6 +22,7 @@ export type Deck = Plain<cards.Deck>;
 export type DeckCard = Plain<cards.DeckCard>;
 export type CollectionFolder = Plain<cards.CollectionFolder>;
 export type FolderCard = Plain<cards.FolderCard>;
+export type CollectionTag = Plain<cards.CollectionTag>;
 
 /** Sentinel folder ID for unallocated copies (not a DB row). */
 export const UnsortedFolderID = 0;
@@ -51,6 +52,12 @@ export type BackendApi = {
   DeleteCollectionFolder(folderID: number): Promise<void>;
   ListCollectionInFolder(folderID: number): Promise<FolderCard[]>;
   MoveCollectionCopies(oracleID: string, fromFolderID: number, toFolderID: number, quantity: number): Promise<void>;
+  ListCollectionTags(): Promise<CollectionTag[]>;
+  CreateCollectionTag(name: string, color: string): Promise<number>;
+  RenameCollectionTag(tagID: number, name: string): Promise<void>;
+  UpdateCollectionTagColor(tagID: number, color: string): Promise<void>;
+  DeleteCollectionTag(tagID: number): Promise<void>;
+  SetCardTags(oracleID: string, tagIDs: number[]): Promise<void>;
   PreviewTextImport(text: string): Promise<ImportPreview>;
   PreviewCSVImport(data: number[]): Promise<ImportPreview>;
   CommitImport(rows: ResolvedLine[]): Promise<void>;
@@ -116,6 +123,12 @@ export function createBackendApi(overrides: Partial<WailsBindings> = {}): Backen
     DeleteCollectionFolder: bindings.DeleteCollectionFolder,
     ListCollectionInFolder: (folderID) => bindings.ListCollectionInFolder(folderID) as Promise<FolderCard[]>,
     MoveCollectionCopies: bindings.MoveCollectionCopies,
+    ListCollectionTags: () => bindings.ListCollectionTags() as Promise<CollectionTag[]>,
+    CreateCollectionTag: (name, color) => bindings.CreateCollectionTag(name, color),
+    RenameCollectionTag: bindings.RenameCollectionTag,
+    UpdateCollectionTagColor: bindings.UpdateCollectionTagColor,
+    DeleteCollectionTag: bindings.DeleteCollectionTag,
+    SetCardTags: (oracleID, tagIDs) => bindings.SetCardTags(oracleID, tagIDs),
     PreviewTextImport: (text) => bindings.PreviewTextImport(text) as Promise<ImportPreview>,
     PreviewCSVImport: (data) => bindings.PreviewCSVImport(data) as Promise<ImportPreview>,
     CommitImport: (rows) => bindings.CommitImport(rows as collection.ResolvedLine[]),

@@ -11,14 +11,22 @@ type CardIdentity struct {
 	ImageNormal   string   `json:"imageNormal,omitempty"`
 }
 
+type CollectionTag struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Color     string `json:"color,omitempty"`
+	CardCount int    `json:"cardCount,omitempty"`
+}
+
 type CollectionItem struct {
-	Card          CardIdentity `json:"card"`
-	Quantity      int          `json:"quantity"`
-	LentQty       int          `json:"lentQty"`
-	InDeck        bool         `json:"inDeck"`
-	Available     int          `json:"available"`
-	AllocatedQty  int          `json:"allocatedQty,omitempty"`
-	UnassignedQty int          `json:"unassignedQty,omitempty"`
+	Card          CardIdentity    `json:"card"`
+	Quantity      int             `json:"quantity"`
+	LentQty       int             `json:"lentQty"`
+	InDeck        bool            `json:"inDeck"`
+	Available     int             `json:"available"`
+	AllocatedQty  int             `json:"allocatedQty,omitempty"`
+	UnassignedQty int             `json:"unassignedQty,omitempty"`
+	Tags          []CollectionTag `json:"tags,omitempty"`
 }
 
 type CollectionFolder struct {
@@ -28,11 +36,12 @@ type CollectionFolder struct {
 }
 
 type FolderCard struct {
-	Card      CardIdentity `json:"card"`
-	Quantity  int          `json:"quantity"`
-	LentQty   int          `json:"lentQty,omitempty"`
-	InDeck    bool         `json:"inDeck,omitempty"`
-	Available int          `json:"available,omitempty"`
+	Card      CardIdentity    `json:"card"`
+	Quantity  int             `json:"quantity"`
+	LentQty   int             `json:"lentQty,omitempty"`
+	InDeck    bool            `json:"inDeck,omitempty"`
+	Available int             `json:"available,omitempty"`
+	Tags      []CollectionTag `json:"tags,omitempty"`
 }
 
 type FolderAllocation struct {

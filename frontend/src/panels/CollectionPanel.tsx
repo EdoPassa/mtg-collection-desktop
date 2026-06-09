@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { CollectionFolder, CollectionItem, FolderCard } from "../backend";
+import type { CollectionFolder, CollectionItem, CollectionTag, FolderCard } from "../backend";
 import { UnsortedFolderID } from "../backend";
 import { CardImage } from "../components/CardImage";
 import { ColorIdentityDot } from "../components/ColorIdentityDot";
@@ -7,8 +7,13 @@ import { EmptyState } from "../components/EmptyState";
 import { FolderTree, scopeLabel } from "../components/FolderTree";
 import { ManaCost } from "../components/ManaCost";
 import { Select } from "../components/Select";
+import { TagBadge, tagBadgeStyle } from "../components/TagBadge";
+import { TagEditor } from "../components/TagEditor";
+import { TagManagerModal } from "../components/TagManagerModal";
 import { flattenFolderOptions, scopeFolderID, type CollectionScope } from "../lib/folders";
 import { matchesColorFilter, type ManaColor } from "../lib/mana";
+import { matchesTagFilter } from "../lib/tags";
+import { useResizableColumns, type CollectionColumnKey } from "../lib/useResizableColumns";
 import type { PanelProps } from "./types";
 
 type StatusFilter = "all" | "in-deck" | "lent" | "free";
@@ -22,6 +27,7 @@ type DisplayRow = {
   inDeck: boolean;
   allocatedQty?: number;
   unassignedQty?: number;
+  tags: CollectionTag[];
 };
 
 const COLOR_BUTTONS: ReadonlyArray<{ id: ManaColor; label: string }> = [
@@ -61,7 +67,8 @@ function collectionItemToRow(row: CollectionItem): DisplayRow {
     available: row.available,
     inDeck: row.inDeck,
     allocatedQty: row.allocatedQty,
-    unassignedQty: row.unassignedQty
+    unassignedQty: row.unassignedQty,
+    tags: row.tags ?? []
   };
 }
 
@@ -71,7 +78,8 @@ function folderCardToRow(row: FolderCard): DisplayRow {
     quantity: row.quantity,
     lentQty: row.lentQty ?? 0,
     available: row.available ?? row.quantity,
-    inDeck: row.inDeck ?? false
+    inDeck: row.inDeck ?? false,
+    tags: row.tags ?? []
   };
 }
 
@@ -87,6 +95,18 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
   const [movingOracleId, setMovingOracleId] = useState<string | null>(null);
   const [moveQty, setMoveQty] = useState(1);
   const [moveTargetId, setMoveTargetId] = useState<string>(String(UnsortedFolderID));
+  const [tags, setTags] = useState<CollectionTag[]>([]);
+  const [activeTagIds, setActiveTagIds] = useState<ReadonlySet<number>>(new Set());
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [editingTagsRow, setEditingTagsRow] = useState<DisplayRow | null>(null);
+
+  async function loadTags() {
+    try {
+      setTags((await api.ListCollectionTags()) ?? []);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
 
   async function loadFolders() {
     try {
@@ -121,7 +141,7 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
   }
 
   async function refreshAll(currentScope: CollectionScope = scope) {
-    await Promise.all([loadFolders(), loadUnsortedCount(), loadRows(currentScope)]);
+    await Promise.all([loadFolders(), loadUnsortedCount(), loadTags(), loadRows(currentScope)]);
   }
 
   useEffect(() => {
@@ -144,9 +164,12 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
       if (!matchesColorFilter(row.card.colorIdentity, activeColors)) {
         return false;
       }
+      if (!matchesTagFilter(row.tags, activeTagIds)) {
+        return false;
+      }
       return true;
     });
-  }, [rows, query, status, activeColors]);
+  }, [rows, query, status, activeColors, activeTagIds]);
 
   const summary = useMemo(() => {
     let totalCopies = 0;
@@ -175,6 +198,69 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
       }
       return next;
     });
+  }
+
+  function toggleTag(tagID: number) {
+    setActiveTagIds((current) => {
+      const next = new Set(current);
+      if (next.has(tagID)) {
+        next.delete(tagID);
+      } else {
+        next.add(tagID);
+      }
+      return next;
+    });
+  }
+
+  async function handleSaveCardTags(oracleID: string, tagIDs: number[]) {
+    try {
+      await api.SetCardTags(oracleID, tagIDs);
+      setEditingTagsRow(null);
+      await Promise.all([loadRows(), loadTags()]);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function handleCreateTag(name: string): Promise<number> {
+    const id = await api.CreateCollectionTag(name, "");
+    await loadTags();
+    return id;
+  }
+
+  async function handleRenameTag(tagID: number, name: string) {
+    try {
+      await api.RenameCollectionTag(tagID, name);
+      await Promise.all([loadTags(), loadRows()]);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function handleUpdateTagColor(tagID: number, color: string) {
+    try {
+      await api.UpdateCollectionTagColor(tagID, color);
+      await Promise.all([loadTags(), loadRows()]);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function handleDeleteTag(tagID: number) {
+    try {
+      await api.DeleteCollectionTag(tagID);
+      setActiveTagIds((current) => {
+        if (!current.has(tagID)) {
+          return current;
+        }
+        const next = new Set(current);
+        next.delete(tagID);
+        return next;
+      });
+      await Promise.all([loadTags(), loadRows()]);
+    } catch (error) {
+      setMessage(String(error));
+    }
   }
 
   async function handleCreateFolder(parentId: number | null, name: string) {
@@ -308,6 +394,28 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
               ))}
             </div>
 
+            <div className="chip-row tag-filter-row" role="group" aria-label="Filter by tag">
+              {tags.map((tag) => {
+                const isActive = activeTagIds.has(tag.id);
+                const isMuted = (tag.cardCount ?? 0) === 0;
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={`chip tag-chip${isActive ? " chip--active" : ""}${isMuted ? " tag-chip--muted" : ""}`}
+                    style={tag.color && isActive ? tagBadgeStyle(tag) : undefined}
+                    aria-pressed={isActive}
+                    onClick={() => toggleTag(tag.id)}
+                  >
+                    {tag.name}
+                  </button>
+                );
+              })}
+              <button type="button" className="ghost tag-manage-btn" onClick={() => setTagManagerOpen(true)}>
+                Manage tags
+              </button>
+            </div>
+
             <div className="mana-filter" role="group" aria-label="Filter by color">
               {COLOR_BUTTONS.map((color) => {
                 const isActive = activeColors.has(color.id);
@@ -358,6 +466,7 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
           ) : view === "table" ? (
             <CollectionTable
               rows={filtered}
+              allTags={tags}
               showAllocation={scope.kind === "all"}
               canMove={scope.kind !== "all"}
               movingOracleId={movingOracleId}
@@ -365,15 +474,21 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
               moveTargetId={moveTargetId}
               folderOptions={folderOptions}
               currentFolderID={currentFolderID}
+              editingTagsRow={editingTagsRow}
               onStartMove={startMove}
               onCancelMove={() => setMovingOracleId(null)}
               onMoveQtyChange={setMoveQty}
               onMoveTargetChange={setMoveTargetId}
               onSubmitMove={(oracleId, maxQty) => void handleMoveCopies(oracleId, maxQty)}
+              onEditTags={setEditingTagsRow}
+              onCloseTagEditor={() => setEditingTagsRow(null)}
+              onSaveCardTags={handleSaveCardTags}
+              onCreateTag={handleCreateTag}
             />
           ) : (
             <CollectionGallery
               rows={filtered}
+              allTags={tags}
               showAllocation={scope.kind === "all"}
               canMove={scope.kind !== "all"}
               movingOracleId={movingOracleId}
@@ -381,21 +496,36 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
               moveTargetId={moveTargetId}
               folderOptions={folderOptions}
               currentFolderID={currentFolderID}
+              editingTagsRow={editingTagsRow}
               onStartMove={startMove}
               onCancelMove={() => setMovingOracleId(null)}
               onMoveQtyChange={setMoveQty}
               onMoveTargetChange={setMoveTargetId}
               onSubmitMove={(oracleId, maxQty) => void handleMoveCopies(oracleId, maxQty)}
+              onEditTags={setEditingTagsRow}
+              onCloseTagEditor={() => setEditingTagsRow(null)}
+              onSaveCardTags={handleSaveCardTags}
+              onCreateTag={handleCreateTag}
             />
           )}
         </div>
       </div>
+
+      <TagManagerModal
+        open={tagManagerOpen}
+        tags={tags}
+        onClose={() => setTagManagerOpen(false)}
+        onRename={handleRenameTag}
+        onUpdateColor={handleUpdateTagColor}
+        onDelete={handleDeleteTag}
+      />
     </section>
   );
 }
 
 type CollectionViewProps = {
   rows: DisplayRow[];
+  allTags: CollectionTag[];
   showAllocation: boolean;
   canMove: boolean;
   movingOracleId: string | null;
@@ -403,12 +533,59 @@ type CollectionViewProps = {
   moveTargetId: string;
   folderOptions: Array<{ id: number; label: string }>;
   currentFolderID: number;
+  editingTagsRow: DisplayRow | null;
   onStartMove: (row: DisplayRow) => void;
   onCancelMove: () => void;
   onMoveQtyChange: (qty: number) => void;
   onMoveTargetChange: (targetId: string) => void;
   onSubmitMove: (oracleId: string, maxQty: number) => void;
+  onEditTags: (row: DisplayRow) => void;
+  onCloseTagEditor: () => void;
+  onSaveCardTags: (oracleID: string, tagIDs: number[]) => Promise<void>;
+  onCreateTag: (name: string) => Promise<number>;
 };
+
+function CardTagsCell({
+  row,
+  allTags,
+  editingTagsRow,
+  onEditTags,
+  onCloseTagEditor,
+  onSaveCardTags,
+  onCreateTag
+}: {
+  row: DisplayRow;
+  allTags: CollectionTag[];
+  editingTagsRow: DisplayRow | null;
+  onEditTags: (row: DisplayRow) => void;
+  onCloseTagEditor: () => void;
+  onSaveCardTags: (oracleID: string, tagIDs: number[]) => Promise<void>;
+  onCreateTag: (name: string) => Promise<number>;
+}) {
+  const isEditing = editingTagsRow?.card.oracleId === row.card.oracleId;
+  return (
+    <div className="card-tags-cell">
+      <div className="card-tags-list">
+        {row.tags.map((tag) => (
+          <TagBadge key={tag.id} tag={tag} onClick={() => onEditTags(row)} />
+        ))}
+        <button type="button" className="ghost card-tags-edit" onClick={() => onEditTags(row)}>
+          {row.tags.length === 0 ? "Add tags" : "Edit"}
+        </button>
+      </div>
+      {isEditing ? (
+        <TagEditor
+          cardName={row.card.name}
+          assignedTags={row.tags}
+          allTags={allTags}
+          onClose={onCloseTagEditor}
+          onSave={(tagIDs) => onSaveCardTags(row.card.oracleId, tagIDs)}
+          onCreateTag={onCreateTag}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 function MoveCopiesForm({
   row,
@@ -459,8 +636,48 @@ function MoveCopiesForm({
   );
 }
 
+type HeaderColumn = {
+  key: CollectionColumnKey;
+  className: string;
+  label: React.ReactNode;
+  ariaLabel?: string;
+};
+
+function ResizableHeaderCell({
+  column,
+  width,
+  onResizeStart
+}: {
+  column: HeaderColumn;
+  width: number;
+  onResizeStart: (key: CollectionColumnKey, clientX: number) => void;
+}) {
+  const resizeLabel = column.ariaLabel ?? (typeof column.label === "string" ? column.label : column.key);
+  return (
+    <th
+      scope="col"
+      className={column.className}
+      style={{ width, minWidth: width, maxWidth: width }}
+      aria-label={column.ariaLabel}
+    >
+      <span className="collection-th-label">{column.label}</span>
+      <span
+        className="col-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={`Resize ${resizeLabel} column`}
+        onMouseDown={(event) => {
+          event.preventDefault();
+          onResizeStart(column.key, event.clientX);
+        }}
+      />
+    </th>
+  );
+}
+
 function CollectionTable({
   rows,
+  allTags,
   showAllocation,
   canMove,
   movingOracleId,
@@ -468,54 +685,68 @@ function CollectionTable({
   moveTargetId,
   folderOptions,
   currentFolderID,
+  editingTagsRow,
   onStartMove,
   onCancelMove,
   onMoveQtyChange,
   onMoveTargetChange,
-  onSubmitMove
+  onSubmitMove,
+  onEditTags,
+  onCloseTagEditor,
+  onSaveCardTags,
+  onCreateTag
 }: CollectionViewProps) {
+  const { widths, startResize } = useResizableColumns();
+
+  const headerColumns = useMemo((): HeaderColumn[] => {
+    const columns: HeaderColumn[] = [
+      { key: "thumb", className: "col-thumb", label: null, ariaLabel: "Card image" },
+      { key: "name", className: "col-name", label: "Card" },
+      { key: "cost", className: "col-cost", label: "Cost" },
+      { key: "type", className: "col-type", label: "Type" },
+      { key: "quantity", className: "col-num", label: showAllocation ? "Owned" : "Here" }
+    ];
+    if (showAllocation) {
+      columns.push(
+        { key: "allocated", className: "col-num", label: "In folders" },
+        { key: "unassigned", className: "col-num", label: "Unsorted" }
+      );
+    }
+    columns.push(
+      { key: "lent", className: "col-num", label: "Lent" },
+      { key: "avail", className: "col-num", label: "Avail" },
+      { key: "status", className: "col-status", label: "Status" },
+      { key: "tags", className: "col-tags", label: "Tags" }
+    );
+    if (canMove) {
+      columns.push({ key: "actions", className: "col-actions", label: "Actions" });
+    }
+    return columns;
+  }, [showAllocation, canMove]);
+
+  const tableMinWidth = useMemo(
+    () => headerColumns.reduce((sum, column) => sum + widths[column.key], 0),
+    [headerColumns, widths]
+  );
+
   return (
-    <div className="collection-table-wrap">
-      <table className="collection-table">
+    <div className="collection-table-wrap" tabIndex={0} aria-label="Collection table, scroll horizontally to see more columns">
+      <table className="collection-table collection-table--resizable" style={{ minWidth: tableMinWidth }}>
+        <colgroup>
+          {headerColumns.map((column) => (
+            <col key={column.key} style={{ width: widths[column.key] }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
-            <th scope="col" className="col-thumb" aria-label="Card image" />
-            <th scope="col" className="col-name">
-              Card
-            </th>
-            <th scope="col" className="col-cost">
-              Cost
-            </th>
-            <th scope="col" className="col-type">
-              Type
-            </th>
-            <th scope="col" className="col-num">
-              {showAllocation ? "Owned" : "Here"}
-            </th>
-            {showAllocation ? (
-              <>
-                <th scope="col" className="col-num">
-                  In folders
-                </th>
-                <th scope="col" className="col-num">
-                  Unsorted
-                </th>
-              </>
-            ) : null}
-            <th scope="col" className="col-num">
-              Lent
-            </th>
-            <th scope="col" className="col-num">
-              Avail
-            </th>
-            <th scope="col" className="col-status">
-              Status
-            </th>
-            {canMove ? (
-              <th scope="col" className="col-actions">
-                Actions
-              </th>
-            ) : null}
+            {headerColumns.map((column) => (
+              <ResizableHeaderCell
+                key={column.key}
+                column={column}
+                width={widths[column.key]}
+                onResizeStart={startResize}
+              />
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -558,6 +789,17 @@ function CollectionTable({
                   {row.inDeck ? "In deck" : "Free"}
                 </span>
               </td>
+              <td className="col-tags">
+                <CardTagsCell
+                  row={row}
+                  allTags={allTags}
+                  editingTagsRow={editingTagsRow}
+                  onEditTags={onEditTags}
+                  onCloseTagEditor={onCloseTagEditor}
+                  onSaveCardTags={onSaveCardTags}
+                  onCreateTag={onCreateTag}
+                />
+              </td>
               {canMove ? (
                 <td className="col-actions">
                   {movingOracleId === row.card.oracleId ? (
@@ -589,6 +831,7 @@ function CollectionTable({
 
 function CollectionGallery({
   rows,
+  allTags,
   showAllocation,
   canMove,
   movingOracleId,
@@ -596,11 +839,16 @@ function CollectionGallery({
   moveTargetId,
   folderOptions,
   currentFolderID,
+  editingTagsRow,
   onStartMove,
   onCancelMove,
   onMoveQtyChange,
   onMoveTargetChange,
-  onSubmitMove
+  onSubmitMove,
+  onEditTags,
+  onCloseTagEditor,
+  onSaveCardTags,
+  onCreateTag
 }: CollectionViewProps) {
   return (
     <div className="collection-gallery">
@@ -646,6 +894,15 @@ function CollectionGallery({
             <span className={`badge ${row.inDeck ? "badge--deck" : "badge--free"}`}>
               {row.inDeck ? "In deck" : "Free"}
             </span>
+            <CardTagsCell
+              row={row}
+              allTags={allTags}
+              editingTagsRow={editingTagsRow}
+              onEditTags={onEditTags}
+              onCloseTagEditor={onCloseTagEditor}
+              onSaveCardTags={onSaveCardTags}
+              onCreateTag={onCreateTag}
+            />
             {canMove ? (
               movingOracleId === row.card.oracleId ? (
                 <MoveCopiesForm

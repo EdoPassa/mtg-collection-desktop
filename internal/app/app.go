@@ -139,3 +139,27 @@ func (a *App) ListCollectionInFolder(folderID int64) ([]cards.FolderCard, error)
 func (a *App) MoveCollectionCopies(oracleID string, fromFolderID, toFolderID int64, quantity int) error {
 	return a.service.MoveCollectionCopies(context.Background(), oracleID, fromFolderID, toFolderID, quantity)
 }
+
+func (a *App) ListCollectionTags() ([]cards.CollectionTag, error) {
+	return a.service.ListCollectionTags(context.Background())
+}
+
+func (a *App) CreateCollectionTag(name, color string) (int64, error) {
+	return a.service.CreateCollectionTag(context.Background(), name, color)
+}
+
+func (a *App) RenameCollectionTag(tagID int64, name string) error {
+	return a.service.RenameCollectionTag(context.Background(), tagID, name)
+}
+
+func (a *App) UpdateCollectionTagColor(tagID int64, color string) error {
+	return a.service.UpdateCollectionTagColor(context.Background(), tagID, color)
+}
+
+func (a *App) DeleteCollectionTag(tagID int64) error {
+	return a.service.DeleteCollectionTag(context.Background(), tagID)
+}
+
+func (a *App) SetCardTags(oracleID string, tagIDs []int64) error {
+	return a.service.SetCardTags(context.Background(), oracleID, tagIDs)
+}

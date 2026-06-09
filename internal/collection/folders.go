@@ -57,6 +57,9 @@ func (s *Service) ListCollectionInFolder(ctx context.Context, folderID int64) ([
 		rows[i].Available = rows[i].Quantity
 		s.enrichCardFromBulk(&rows[i].Card)
 	}
+	if err := s.attachTagsToFolderCards(ctx, rows); err != nil {
+		return nil, err
+	}
 	return nonNilSlice(rows), nil
 }
 

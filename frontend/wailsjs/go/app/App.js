@@ -26,8 +26,16 @@ export function CreateCollectionFolder(arg1, arg2) {
   return window['go']['app']['App']['CreateCollectionFolder'](arg1, arg2);
 }
 
+export function CreateCollectionTag(arg1, arg2) {
+  return window['go']['app']['App']['CreateCollectionTag'](arg1, arg2);
+}
+
 export function DeleteCollectionFolder(arg1) {
   return window['go']['app']['App']['DeleteCollectionFolder'](arg1);
+}
+
+export function DeleteCollectionTag(arg1) {
+  return window['go']['app']['App']['DeleteCollectionTag'](arg1);
 }
 
 export function DeleteDeck(arg1) {
@@ -60,6 +68,10 @@ export function ListCollectionFolders() {
 
 export function ListCollectionInFolder(arg1) {
   return window['go']['app']['App']['ListCollectionInFolder'](arg1);
+}
+
+export function ListCollectionTags() {
+  return window['go']['app']['App']['ListCollectionTags']();
 }
 
 export function ListDeckCards(arg1) {
@@ -98,6 +110,10 @@ export function RenameCollectionFolder(arg1, arg2) {
   return window['go']['app']['App']['RenameCollectionFolder'](arg1, arg2);
 }
 
+export function RenameCollectionTag(arg1, arg2) {
+  return window['go']['app']['App']['RenameCollectionTag'](arg1, arg2);
+}
+
 export function RenameDeck(arg1, arg2) {
   return window['go']['app']['App']['RenameDeck'](arg1, arg2);
 }
@@ -112,6 +128,10 @@ export function ResolverStatus() {
 
 export function ReturnCard(arg1, arg2) {
   return window['go']['app']['App']['ReturnCard'](arg1, arg2);
+}
+
+export function SetCardTags(arg1, arg2) {
+  return window['go']['app']['App']['SetCardTags'](arg1, arg2);
 }
 
 export function SetDeckCardQuantity(arg1, arg2, arg3, arg4) {
@@ -140,4 +160,8 @@ export function SimSetOracleFocus(arg1, arg2) {
 
 export function StartDeckSimulation(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['StartDeckSimulation'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateCollectionTagColor(arg1, arg2) {
+  return window['go']['app']['App']['UpdateCollectionTagColor'](arg1, arg2);
 }

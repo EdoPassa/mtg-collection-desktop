@@ -394,6 +394,113 @@ func TestListFoldersReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 	}
 }
 
+func TestTagCRUDAndAssignments(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	card := cards.CardIdentity{OracleID: "oracle-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{card}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), card.OracleID, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	tradeID, err := store.CreateTag(t.Context(), "Trade", "#3b82f6")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foilID, err := store.CreateTag(t.Context(), "Foil", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateTag(t.Context(), "trade", ""); err == nil {
+		t.Fatal("CreateTag should reject duplicate names case-insensitively")
+	}
+
+	if err := store.SetCardTags(t.Context(), card.OracleID, []int64{tradeID, foilID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetCardTags(t.Context(), "missing-oracle", []int64{tradeID}); err == nil {
+		t.Fatal("SetCardTags should reject cards not in collection")
+	}
+
+	tagIDs, err := store.GetCardTagIDs(t.Context(), card.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tagIDs) != 2 || tagIDs[0] != tradeID || tagIDs[1] != foilID {
+		t.Fatalf("tag ids = %#v, want trade then foil", tagIDs)
+	}
+
+	byOracle, err := store.GetTagsByOracleID(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(byOracle[card.OracleID]) != 2 {
+		t.Fatalf("tags by oracle = %#v, want 2 tags", byOracle[card.OracleID])
+	}
+
+	if err := store.SetCardTags(t.Context(), card.OracleID, []int64{tradeID}); err != nil {
+		t.Fatal(err)
+	}
+	tagIDs, err = store.GetCardTagIDs(t.Context(), card.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tagIDs) != 1 || tagIDs[0] != tradeID {
+		t.Fatalf("tag ids after replace = %#v, want only trade", tagIDs)
+	}
+
+	if err := store.RenameTag(t.Context(), tradeID, "For Trade"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateTagColor(t.Context(), foilID, "#22c55e"); err != nil {
+		t.Fatal(err)
+	}
+
+	allTags, err := store.ListTags(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allTags) != 2 {
+		t.Fatalf("tags = %#v, want 2", allTags)
+	}
+	if allTags[0].Name != "Foil" || allTags[0].Color != "#22c55e" {
+		t.Fatalf("foil tag = %#v", allTags[0])
+	}
+	if allTags[1].Name != "For Trade" || allTags[1].CardCount != 1 {
+		t.Fatalf("trade tag = %#v, want count 1", allTags[1])
+	}
+
+	if err := store.DeleteTag(t.Context(), foilID); err != nil {
+		t.Fatal(err)
+	}
+	tagIDs, err = store.GetCardTagIDs(t.Context(), card.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tagIDs) != 1 {
+		t.Fatalf("tag ids after delete = %#v, want only trade", tagIDs)
+	}
+}
+
+func TestListTagsReturnsEmptySliceForEmptyDatabase(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	tags, err := store.ListTags(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tags == nil {
+		t.Fatal("ListTags returned nil, want empty slice")
+	}
+	if len(tags) != 0 {
+		t.Fatalf("tags = %#v, want empty", tags)
+	}
+}
+
 func openTestStore(t *testing.T) *Store {
 	t.Helper()
 	store, err := Open(filepath.Join(t.TempDir(), "collection.sqlite3"))

@@ -17,7 +17,11 @@ export function CompareDeck(arg1:string):Promise<collection.DeckCompareResult>;
 
 export function CreateCollectionFolder(arg1:any,arg2:string):Promise<number>;
 
+export function CreateCollectionTag(arg1:string,arg2:string):Promise<number>;
+
 export function DeleteCollectionFolder(arg1:number):Promise<void>;
+
+export function DeleteCollectionTag(arg1:number):Promise<void>;
 
 export function DeleteDeck(arg1:number):Promise<void>;
 
@@ -34,6 +38,8 @@ export function ListCollection():Promise<Array<cards.CollectionItem>>;
 export function ListCollectionFolders():Promise<Array<cards.CollectionFolder>>;
 
 export function ListCollectionInFolder(arg1:number):Promise<Array<cards.FolderCard>>;
+
+export function ListCollectionTags():Promise<Array<cards.CollectionTag>>;
 
 export function ListDeckCards(arg1:number):Promise<Array<cards.DeckCard>>;
 
@@ -53,6 +59,8 @@ export function PreviewTextImport(arg1:string):Promise<collection.ImportPreview>
 
 export function RenameCollectionFolder(arg1:number,arg2:string):Promise<void>;
 
+export function RenameCollectionTag(arg1:number,arg2:string):Promise<void>;
+
 export function RenameDeck(arg1:number,arg2:string):Promise<void>;
 
 export function RepairCompareMismatches(arg1:Array<collection.RepairCandidate>):Promise<void>;
@@ -60,6 +68,8 @@ export function RepairCompareMismatches(arg1:Array<collection.RepairCandidate>):
 export function ResolverStatus():Promise<string>;
 
 export function ReturnCard(arg1:number,arg2:string):Promise<void>;
+
+export function SetCardTags(arg1:string,arg2:Array<number>):Promise<void>;
 
 export function SetDeckCardQuantity(arg1:number,arg2:string,arg3:string,arg4:number):Promise<void>;
 
@@ -74,3 +84,5 @@ export function SimPutOnBottom(arg1:string,arg2:string):Promise<analysis.Simulat
 export function SimSetOracleFocus(arg1:string,arg2:string):Promise<analysis.SimulationState>;
 
 export function StartDeckSimulation(arg1:number,arg2:string,arg3:string,arg4:number):Promise<analysis.SimulationState>;
+
+export function UpdateCollectionTagColor(arg1:number,arg2:string):Promise<void>;

@@ -55,6 +55,23 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (1);
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (2);
 INSERT OR IGNORE INTO schema_migrations(version) VALUES (3);
+INSERT OR IGNORE INTO schema_migrations(version) VALUES (4);
+`
+
+const migrateV4SQL = `
+CREATE TABLE tags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  color TEXT
+);
+
+CREATE TABLE card_tags (
+  oracle_id TEXT NOT NULL REFERENCES cards(oracle_id) ON DELETE CASCADE,
+  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (oracle_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_card_tags_tag ON card_tags(tag_id);
 `
 
 const migrateV3SQL = `

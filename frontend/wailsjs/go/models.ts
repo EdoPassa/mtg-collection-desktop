@@ -257,6 +257,24 @@ export namespace cards {
 	        this.parentId = source["parentId"];
 	    }
 	}
+	export class CollectionTag {
+	    id: number;
+	    name: string;
+	    color?: string;
+	    cardCount?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollectionTag(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.cardCount = source["cardCount"];
+	    }
+	}
 	export class CollectionItem {
 	    card: CardIdentity;
 	    quantity: number;
@@ -265,6 +283,7 @@ export namespace cards {
 	    available: number;
 	    allocatedQty?: number;
 	    unassignedQty?: number;
+	    tags?: CollectionTag[];
 	
 	    static createFrom(source: any = {}) {
 	        return new CollectionItem(source);
@@ -279,6 +298,7 @@ export namespace cards {
 	        this.available = source["available"];
 	        this.allocatedQty = source["allocatedQty"];
 	        this.unassignedQty = source["unassignedQty"];
+	        this.tags = this.convertValues(source["tags"], CollectionTag);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -299,6 +319,7 @@ export namespace cards {
 		    return a;
 		}
 	}
+	
 	export class Deck {
 	    id: number;
 	    name: string;
@@ -353,6 +374,7 @@ export namespace cards {
 	    lentQty?: number;
 	    inDeck?: boolean;
 	    available?: number;
+	    tags?: CollectionTag[];
 	
 	    static createFrom(source: any = {}) {
 	        return new FolderCard(source);
@@ -365,6 +387,7 @@ export namespace cards {
 	        this.lentQty = source["lentQty"];
 	        this.inDeck = source["inDeck"];
 	        this.available = source["available"];
+	        this.tags = this.convertValues(source["tags"], CollectionTag);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
