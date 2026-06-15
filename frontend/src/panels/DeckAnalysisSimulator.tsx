@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { BackendApi, CollectionTag, DeckCard, SimulationState } from "../backend";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { BackendApi, CollectionTag, DeckCard, SimulationCard, SimulationState } from "../backend";
 import { CardImage } from "../components/CardImage";
 import { EmptyState } from "../components/EmptyState";
 import { Select } from "../components/Select";
@@ -22,6 +22,30 @@ function tagFromStat(stat: { tagId: number; name: string; color?: string }): Col
   return { id: stat.tagId, name: stat.name, color: stat.color };
 }
 
+function mergeHandOrder(prev: string[], hand: SimulationCard[]): string[] {
+  const slotIds = hand.map((card) => card.slotId);
+  const slotSet = new Set(slotIds);
+  const kept = prev.filter((slotId) => slotSet.has(slotId));
+  const keptSet = new Set(kept);
+  const appended = slotIds.filter((slotId) => !keptSet.has(slotId));
+  return [...kept, ...appended];
+}
+
+function reorderHandOrder(order: string[], sourceId: string, targetId: string): string[] {
+  if (sourceId === targetId) {
+    return order;
+  }
+  const from = order.indexOf(sourceId);
+  const to = order.indexOf(targetId);
+  if (from < 0 || to < 0) {
+    return order;
+  }
+  const next = [...order];
+  next.splice(from, 1);
+  next.splice(to, 0, sourceId);
+  return next;
+}
+
 export function DeckAnalysisSimulator({
   api,
   setMessage,
@@ -35,7 +59,23 @@ export function DeckAnalysisSimulator({
 }: Props) {
   const [sim, setSim] = useState<SimulationState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [handOrder, setHandOrder] = useState<string[]>([]);
+  const [dragSlotId, setDragSlotId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const sessionRef = useRef<string | undefined>(undefined);
+
+  const handSignature = useMemo(
+    () => (sim ? sim.hand.map((card) => card.slotId).join("\0") : ""),
+    [sim]
+  );
+
+  useEffect(() => {
+    if (!sim) {
+      setHandOrder([]);
+      return;
+    }
+    setHandOrder((prev) => mergeHandOrder(prev, sim.hand));
+  }, [handSignature, sim]);
 
   const endSession = useCallback(
     async (sessionId: string | undefined) => {
@@ -182,6 +222,25 @@ export function DeckAnalysisSimulator({
   const awaitingBottom = sim?.phase === "awaiting_bottom";
   const tagStats = sim?.stats.tags ?? [];
   const focusedTag = tagStats.find((stat) => stat.tagId === selectedTagId);
+  const handBySlot = useMemo(() => {
+    const map = new Map<string, SimulationCard>();
+    for (const card of sim?.hand ?? []) {
+      map.set(card.slotId, card);
+    }
+    return map;
+  }, [sim?.hand]);
+  const orderedHand = handOrder
+    .map((slotId) => handBySlot.get(slotId))
+    .filter((card): card is SimulationCard => card !== undefined);
+
+  function handleHandDrop(targetSlotId: string, sourceSlotId: string | null) {
+    if (!sourceSlotId || sourceSlotId === targetSlotId) {
+      return;
+    }
+    setHandOrder((prev) => reorderHandOrder(prev, sourceSlotId, targetSlotId));
+    setDragSlotId(null);
+    setDropTargetId(null);
+  }
 
   return (
     <div className="analysis-simulator">
@@ -230,33 +289,92 @@ export function DeckAnalysisSimulator({
             <Stat label="Mulligans" value={sim.mulliganCount} />
           </div>
 
+          {!awaitingBottom && orderedHand.length > 1 && (
+            <p className="analysis-hint sim-hand-hint">Drag cards to rearrange your hand.</p>
+          )}
+
           <div className="sim-hand" aria-label="Opening hand">
-            {sim.hand.map((card) => (
-              <button
-                key={card.slotId}
-                type="button"
-                className={`sim-hand-card${awaitingBottom ? " sim-hand-card--bottom-pick" : ""}${card.isLand ? " sim-hand-card--land" : ""}`}
-                disabled={!awaitingBottom || loading}
-                aria-label={
-                  awaitingBottom ? `Put ${card.name} on bottom` : card.name
-                }
-                onClick={() => {
-                  if (!awaitingBottom || !sim) {
-                    return;
-                  }
-                  void runAction(() => api.SimPutOnBottom(sim.sessionId, card.slotId));
-                }}
-              >
-                <CardImage
-                  name={card.name}
-                  small={card.imageSmall}
-                  normal={card.imageNormal}
-                  colorIdentity={card.colorIdentity}
-                  size="thumb"
-                />
-                <span className="sim-hand-card-name">{card.name}</span>
-              </button>
-            ))}
+            {orderedHand.map((card) => {
+              const cardClassName = [
+                "sim-hand-card",
+                card.isLand ? "sim-hand-card--land" : "",
+                awaitingBottom ? "sim-hand-card--bottom-pick" : "sim-hand-card--draggable",
+                dragSlotId === card.slotId ? "sim-hand-card--dragging" : "",
+                dropTargetId === card.slotId && dragSlotId !== card.slotId ? "sim-hand-card--drop-target" : ""
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              const cardBody = (
+                <>
+                  <CardImage
+                    name={card.name}
+                    small={card.imageSmall}
+                    normal={card.imageNormal}
+                    colorIdentity={card.colorIdentity}
+                    size="tile"
+                  />
+                  <span className="sim-hand-card-name">{card.name}</span>
+                </>
+              );
+
+              if (awaitingBottom) {
+                return (
+                  <button
+                    key={card.slotId}
+                    type="button"
+                    className={cardClassName}
+                    disabled={loading}
+                    aria-label={`Put ${card.name} on bottom`}
+                    onClick={() => {
+                      if (!sim) {
+                        return;
+                      }
+                      void runAction(() => api.SimPutOnBottom(sim.sessionId, card.slotId));
+                    }}
+                  >
+                    {cardBody}
+                  </button>
+                );
+              }
+
+              return (
+                <div
+                  key={card.slotId}
+                  className={cardClassName}
+                  draggable={!loading}
+                  aria-label={card.name}
+                  aria-grabbed={dragSlotId === card.slotId}
+                  onDragStart={(event) => {
+                    setDragSlotId(card.slotId);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", card.slotId);
+                  }}
+                  onDragEnd={() => {
+                    setDragSlotId(null);
+                    setDropTargetId(null);
+                  }}
+                  onDragOver={(event) => {
+                    if (!dragSlotId || dragSlotId === card.slotId) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropTargetId(card.slotId);
+                  }}
+                  onDragLeave={() => {
+                    setDropTargetId((current) => (current === card.slotId ? null : current));
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const sourceSlotId = dragSlotId ?? (event.dataTransfer.getData("text/plain") || null);
+                    handleHandDrop(card.slotId, sourceSlotId);
+                  }}
+                >
+                  {cardBody}
+                </div>
+              );
+            })}
           </div>
 
           {mainboardCards.length > 0 && (
