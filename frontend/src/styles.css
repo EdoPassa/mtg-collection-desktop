@@ -1138,6 +1138,57 @@ label.analysis-field {
   padding: 0.5rem 0.65rem;
 }
 
+.analysis-subheading {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.analysis-tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.analysis-tag-row {
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: grid;
+  gap: 0.5rem 0.75rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%;
+}
+
+.analysis-tag-row:hover {
+  border-color: var(--border-strong);
+}
+
+.analysis-tag-row--active {
+  background: var(--gold-soft);
+  border-color: var(--accent-border);
+}
+
+.analysis-tag-copies {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.analysis-tag-prob {
+  color: var(--gold-bright);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .analysis-grid {
   display: grid;
   gap: 0.75rem;

@@ -21,6 +21,8 @@ const defaultSimulationState: SimulationState = {
     nextDrawLandProbFormatted: "—",
     nextDrawCardProb: 0,
     nextDrawCardProbFormatted: "—",
+    nextDrawTagProb: 0,
+    nextDrawTagProbFormatted: "—",
     afterOneDrawLandsProb: 0,
     afterOneDrawLandsProbFormatted: "—",
     minLandsThreshold: 2
@@ -77,12 +79,18 @@ export function defaultWailsOverrides(): Partial<WailsBindings> {
       landProbability: 0,
       landProbabilityFormatted: "—"
     }),
+    AnalyzeDeckTags: vi.fn().mockResolvedValue({
+      populationN: 60,
+      deckTotal: 0,
+      tags: []
+    }),
     StartDeckSimulation: vi.fn().mockResolvedValue(defaultSimulationState),
     SimNewOpening: vi.fn().mockResolvedValue(defaultSimulationState),
     SimMulligan: vi.fn().mockResolvedValue({ ...defaultSimulationState, phase: "awaiting_bottom" }),
     SimPutOnBottom: vi.fn().mockResolvedValue(defaultSimulationState),
     SimDrawCard: vi.fn().mockResolvedValue(defaultSimulationState),
     SimSetOracleFocus: vi.fn().mockResolvedValue(defaultSimulationState),
+    SimSetTagFocus: vi.fn().mockResolvedValue(defaultSimulationState),
     EndDeckSimulation: vi.fn().mockResolvedValue(undefined)
   };
 }

@@ -27,6 +27,7 @@ type Simulation struct {
 	Phase         string
 	MulliganCount int
 	OracleFocus   string
+	TagFocus      int64
 	MinLands      int
 	rng           *mathrand.Rand
 }
@@ -69,8 +70,8 @@ func (st *SessionStore) Delete(id string) {
 }
 
 // NewSimulation builds a simulation from deck rows.
-func NewSimulation(deckID int64, formatTarget string, rows []cards.DeckCard, oracleFocus string, minLands int) *Simulation {
-	pool := BuildDeckPool(rows, formatTarget)
+func NewSimulation(deckID int64, formatTarget string, rows []cards.DeckCard, tagsByOracle map[string][]TagRef, oracleFocus string, tagFocus int64, minLands int) *Simulation {
+	pool := BuildDeckPool(rows, formatTarget, tagsByOracle)
 	lib := append([]poolSlot(nil), pool.Slots...)
 	sim := &Simulation{
 		DeckID:       deckID,
@@ -79,6 +80,7 @@ func NewSimulation(deckID int64, formatTarget string, rows []cards.DeckCard, ora
 		Library:      lib,
 		Phase:        PhasePlaying,
 		OracleFocus:  oracleFocus,
+		TagFocus:     tagFocus,
 		MinLands:     minLands,
 		rng:          mathrand.New(mathrand.NewSource(randSource())),
 	}
@@ -90,7 +92,7 @@ func NewSimulation(deckID int64, formatTarget string, rows []cards.DeckCard, ora
 
 // NewSimulationWithRNG is for tests with a fixed seed.
 func NewSimulationWithRNG(deckID int64, formatTarget string, rows []cards.DeckCard, seed int64) *Simulation {
-	sim := NewSimulation(deckID, formatTarget, rows, "", 2)
+	sim := NewSimulation(deckID, formatTarget, rows, nil, "", 0, 2)
 	sim.rng = mathrand.New(mathrand.NewSource(seed))
 	return sim
 }
@@ -210,7 +212,7 @@ func (s *Simulation) bottomCards() []SimulationCard {
 func (s *Simulation) State(sessionID string) SimulationState {
 	hand := s.handCards()
 	bottom := s.bottomCards()
-	stats := computeDrawStats(s.Pool, hand, bottom, s.OracleFocus, s.MinLands)
+	stats := computeDrawStats(s.Pool, hand, bottom, s.OracleFocus, s.TagFocus, s.MinLands)
 
 	totalCards := len(s.Library) + len(s.Hand) + len(s.Bottom)
 	canMulligan := s.Phase == PhasePlaying && totalCards >= openingHandSize
@@ -233,4 +235,9 @@ func (s *Simulation) State(sessionID string) SimulationState {
 // SetOracleFocus updates the card used for next-draw stats.
 func (s *Simulation) SetOracleFocus(oracleID string) {
 	s.OracleFocus = oracleID
+}
+
+// SetTagFocus updates which tag next-draw stats use.
+func (s *Simulation) SetTagFocus(tagID int64) {
+	s.TagFocus = tagID
 }

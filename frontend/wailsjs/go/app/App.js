@@ -10,6 +10,10 @@ export function AnalyzeDeckDraw(arg1) {
   return window['go']['app']['App']['AnalyzeDeckDraw'](arg1);
 }
 
+export function AnalyzeDeckTags(arg1) {
+  return window['go']['app']['App']['AnalyzeDeckTags'](arg1);
+}
+
 export function BuildDeckFromCompare(arg1) {
   return window['go']['app']['App']['BuildDeckFromCompare'](arg1);
 }
@@ -158,8 +162,12 @@ export function SimSetOracleFocus(arg1, arg2) {
   return window['go']['app']['App']['SimSetOracleFocus'](arg1, arg2);
 }
 
-export function StartDeckSimulation(arg1, arg2, arg3, arg4) {
-  return window['go']['app']['App']['StartDeckSimulation'](arg1, arg2, arg3, arg4);
+export function SimSetTagFocus(arg1, arg2) {
+  return window['go']['app']['App']['SimSetTagFocus'](arg1, arg2);
+}
+
+export function StartDeckSimulation(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['StartDeckSimulation'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function UpdateCollectionTagColor(arg1, arg2) {

@@ -55,16 +55,51 @@ type SimulationCard struct {
 
 // DrawStats are conditional probabilities for the current simulation state.
 type DrawStats struct {
-	LandsInHand                    int     `json:"landsInHand"`
-	LibraryRemaining               int     `json:"libraryRemaining"`
-	NextDrawLandProb               float64 `json:"nextDrawLandProb"`
-	NextDrawLandProbFormatted      string  `json:"nextDrawLandProbFormatted"`
-	NextDrawCardProb               float64 `json:"nextDrawCardProb"`
-	NextDrawCardProbFormatted      string  `json:"nextDrawCardProbFormatted"`
-	OracleIDUsed                   string  `json:"oracleIdUsed,omitempty"`
-	AfterOneDrawLandsProb          float64 `json:"afterOneDrawLandsProb"`
-	AfterOneDrawLandsProbFormatted string  `json:"afterOneDrawLandsProbFormatted"`
-	MinLandsThreshold              int     `json:"minLandsThreshold"`
+	LandsInHand                    int            `json:"landsInHand"`
+	LibraryRemaining               int            `json:"libraryRemaining"`
+	NextDrawLandProb               float64        `json:"nextDrawLandProb"`
+	NextDrawLandProbFormatted      string         `json:"nextDrawLandProbFormatted"`
+	NextDrawCardProb               float64        `json:"nextDrawCardProb"`
+	NextDrawCardProbFormatted      string         `json:"nextDrawCardProbFormatted"`
+	OracleIDUsed                   string         `json:"oracleIdUsed,omitempty"`
+	NextDrawTagProb                float64        `json:"nextDrawTagProb"`
+	NextDrawTagProbFormatted       string         `json:"nextDrawTagProbFormatted"`
+	TagIDUsed                      int64          `json:"tagIdUsed,omitempty"`
+	AfterOneDrawLandsProb          float64        `json:"afterOneDrawLandsProb"`
+	AfterOneDrawLandsProbFormatted string         `json:"afterOneDrawLandsProbFormatted"`
+	MinLandsThreshold              int            `json:"minLandsThreshold"`
+	Tags                           []TagDeckStat  `json:"tags,omitempty"`
+}
+
+// TagDeckStat is per-tag probability for a deck or simulation state.
+type TagDeckStat struct {
+	TagID                 int64   `json:"tagId"`
+	Name                  string  `json:"name"`
+	Color                 string  `json:"color,omitempty"`
+	CopiesInDeck          int     `json:"copiesInDeck"`
+	CopiesInLibrary       int     `json:"copiesInLibrary,omitempty"`
+	NextDrawProb          float64 `json:"nextDrawProb,omitempty"`
+	NextDrawProbFormatted string  `json:"nextDrawProbFormatted,omitempty"`
+	SampleProb            float64 `json:"sampleProb"`
+	SampleProbFormatted   string  `json:"sampleProbFormatted"`
+}
+
+// DeckTagAnalysisRequest is input for tag breakdown odds.
+type DeckTagAnalysisRequest struct {
+	DeckID       int64  `json:"deckId"`
+	FormatTarget string `json:"formatTarget"`
+	SampleSize   int    `json:"sampleSize"`
+	MinTagCards  int    `json:"minTagCards"`
+	TagFocus     int64  `json:"tagFocus"`
+}
+
+// DeckTagAnalysisResult is tag breakdown calculator output.
+type DeckTagAnalysisResult struct {
+	PopulationN int           `json:"populationN"`
+	DeckTotal   int           `json:"deckTotal"`
+	Tags        []TagDeckStat `json:"tags"`
+	Focus       *TagDeckStat  `json:"focus,omitempty"`
+	SizeWarning string        `json:"sizeWarning,omitempty"`
 }
 
 // SimulationState is returned after each simulation action.

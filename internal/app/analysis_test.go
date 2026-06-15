@@ -41,6 +41,59 @@ func TestAppHypergeometric(t *testing.T) {
 	}
 }
 
+func TestAppAnalyzeDeckTags(t *testing.T) {
+	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	ctx := t.Context()
+	deckID, err := store.CreateDeck(ctx, "Tagged")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ramp := cards.CardIdentity{OracleID: "ramp", Name: "Ramp", TypeLine: "Sorcery"}
+	filler := cards.CardIdentity{OracleID: "filler", Name: "Filler", TypeLine: "Instant"}
+	if err := store.UpsertCards(ctx, []cards.CardIdentity{ramp, filler}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetDeckCardQuantity(ctx, deckID, ramp.OracleID, cards.BoardMain, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetDeckCardQuantity(ctx, deckID, filler.OracleID, cards.BoardMain, 56); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(ctx, ramp.OracleID, 4); err != nil {
+		t.Fatal(err)
+	}
+	tagID, err := store.CreateTag(ctx, "Ramp", "#00aa00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetCardTags(ctx, ramp.OracleID, []int64{tagID}); err != nil {
+		t.Fatal(err)
+	}
+
+	app := New(store, fakeResolver{}, "api-only", resolver.BulkOracleIndex{})
+	result, err := app.AnalyzeDeckTags(analysis.DeckTagAnalysisRequest{
+		DeckID:       deckID,
+		FormatTarget: analysis.FormatStandard,
+		SampleSize:   7,
+		MinTagCards:  1,
+		TagFocus:     tagID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Tags) != 1 || result.Tags[0].CopiesInDeck != 4 {
+		t.Fatalf("tags = %#v", result.Tags)
+	}
+	if result.Focus == nil || result.Focus.TagID != tagID {
+		t.Fatalf("focus = %#v", result.Focus)
+	}
+}
+
 func TestAppDeckSimulationLifecycle(t *testing.T) {
 	store, err := storage.Open(filepath.Join(t.TempDir(), "collection.sqlite3"))
 	if err != nil {
@@ -66,7 +119,7 @@ func TestAppDeckSimulationLifecycle(t *testing.T) {
 	}
 
 	app := New(store, fakeResolver{}, "api-only", resolver.BulkOracleIndex{})
-	state, err := app.StartDeckSimulation(deckID, analysis.FormatStandard, "spell", 2)
+	state, err := app.StartDeckSimulation(deckID, analysis.FormatStandard, "spell", 0, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

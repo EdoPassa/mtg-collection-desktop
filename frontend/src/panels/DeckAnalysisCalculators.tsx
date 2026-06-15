@@ -1,8 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
-import type { BackendApi, Deck, DeckCard, DeckDrawAnalysisResult, HypergeometricResult } from "../backend";
+import type {
+  BackendApi,
+  CollectionTag,
+  Deck,
+  DeckCard,
+  DeckDrawAnalysisResult,
+  DeckTagAnalysisResult,
+  HypergeometricResult,
+  TagDeckStat
+} from "../backend";
 import { EmptyState } from "../components/EmptyState";
 import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
+import { TagBadge } from "../components/TagBadge";
 import { isMainboard } from "../lib/deckBoard";
 
 const DRAW_PRESETS = [
@@ -20,6 +30,8 @@ type Props = {
   cards: DeckCard[];
   formatTarget: string;
   formatTargetSize: number;
+  selectedTagId: number;
+  onTagChange: (tagId: number) => void;
 };
 
 export function DeckAnalysisCalculators({
@@ -28,7 +40,9 @@ export function DeckAnalysisCalculators({
   deck,
   cards,
   formatTarget,
-  formatTargetSize
+  formatTargetSize,
+  selectedTagId,
+  onTagChange
 }: Props) {
   const [landsInDeck, setLandsInDeck] = useState("");
   const [landsManual, setLandsManual] = useState(false);
@@ -36,12 +50,14 @@ export function DeckAnalysisCalculators({
   const [sampleSize, setSampleSize] = useState(7);
   const [minCardCopies, setMinCardCopies] = useState(1);
   const [minLands, setMinLands] = useState(2);
+  const [minTagCards, setMinTagCards] = useState(1);
   const [genericN, setGenericN] = useState(formatTargetSize);
   const [genericK, setGenericK] = useState(4);
   const [genericNsample, setGenericNsample] = useState(7);
   const [genericMinK, setGenericMinK] = useState(1);
   const [genericMode, setGenericMode] = useState<"at-least" | "exactly">("at-least");
   const [deckResult, setDeckResult] = useState<DeckDrawAnalysisResult | null>(null);
+  const [tagResult, setTagResult] = useState<DeckTagAnalysisResult | null>(null);
   const [genericResult, setGenericResult] = useState<HypergeometricResult | null>(null);
 
   const mainboardCards = useMemo(() => cards.filter((row) => isMainboard(row.board)), [cards]);
@@ -68,9 +84,14 @@ export function DeckAnalysisCalculators({
   useEffect(() => {
     setLandsManual(false);
     setLandsInDeck("");
-  }, [deck.id]);
+    onTagChange(0);
+  }, [deck.id, onTagChange]);
 
   const landsKInput = landsInDeck !== "" ? Number(landsInDeck) : 0;
+
+  function tagToCollectionTag(stat: TagDeckStat): CollectionTag {
+    return { id: stat.tagId, name: stat.name, color: stat.color };
+  }
 
   useEffect(() => {
     if (mainboardCards.length === 0) {
@@ -109,6 +130,39 @@ export function DeckAnalysisCalculators({
     minLands,
     landsKInput,
     landsManual,
+    mainboardCards.length,
+    setMessage
+  ]);
+
+  useEffect(() => {
+    if (mainboardCards.length === 0) {
+      setTagResult(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await api.AnalyzeDeckTags({
+            deckId: deck.id,
+            formatTarget,
+            sampleSize,
+            minTagCards,
+            tagFocus: selectedTagId
+          });
+          setTagResult(result);
+        } catch (error) {
+          setMessage(String(error));
+        }
+      })();
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [
+    api,
+    deck.id,
+    formatTarget,
+    sampleSize,
+    minTagCards,
+    selectedTagId,
     mainboardCards.length,
     setMessage
   ]);
@@ -261,6 +315,61 @@ export function DeckAnalysisCalculators({
           Chance for at least {minLands} land(s) in {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
           <strong>{deckResult?.landProbabilityFormatted ?? "—"}</strong>
         </p>
+      </article>
+
+      <article className="analysis-card">
+        <h3>Collection tags</h3>
+        <p className="analysis-hint">
+          Tags come from your collection labels on each card&apos;s oracle. Only mainboard copies count. Click a tag to
+          focus it across simulator and calculators.
+        </p>
+        {mainboardCards.length === 0 ? (
+          <EmptyState title="No mainboard cards" detail="Add mainboard cards to analyze tag odds." />
+        ) : tagResult !== null && (tagResult.tags ?? []).length === 0 ? (
+          <EmptyState
+            title="No tagged cards in deck"
+            detail="Tag cards in Collection, then build or update this deck with those cards."
+          />
+        ) : tagResult === null ? (
+          <p className="analysis-hint">Loading tag odds…</p>
+        ) : (
+          <>
+            <label className="analysis-field">
+              At least tagged copies
+              <input
+                aria-label="Minimum tagged cards drawn"
+                type="number"
+                min={1}
+                max={sampleSize}
+                value={minTagCards}
+                onChange={(event) => setMinTagCards(Math.max(1, Number(event.target.value) || 1))}
+              />
+            </label>
+            {selectedTagId > 0 && tagResult.focus && (
+              <p className="analysis-result" aria-live="polite">
+                Focus — chance for at least {minTagCards} &ldquo;{tagResult.focus.name}&rdquo; in{" "}
+                {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
+                <strong>{tagResult.focus.sampleProbFormatted}</strong> ({tagResult.focus.copiesInDeck} in deck)
+              </p>
+            )}
+            <ul className="analysis-tag-list" aria-label="Tag draw odds">
+              {(tagResult.tags ?? []).map((stat) => (
+                <li key={stat.tagId}>
+                  <button
+                    type="button"
+                    className={`analysis-tag-row${selectedTagId === stat.tagId ? " analysis-tag-row--active" : ""}`}
+                    onClick={() => onTagChange(selectedTagId === stat.tagId ? 0 : stat.tagId)}
+                  >
+                    <TagBadge tag={tagToCollectionTag(stat)} />
+                    <span className="analysis-tag-copies">{stat.copiesInDeck} in deck</span>
+                    <span className="analysis-tag-prob">{stat.sampleProbFormatted}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {tagResult.sizeWarning && <p className="analysis-warning">{tagResult.sizeWarning}</p>}
+          </>
+        )}
       </article>
 
       <article className="analysis-card">

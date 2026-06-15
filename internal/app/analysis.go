@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"mtgcollection/internal/analysis"
+	"mtgcollection/internal/cards"
 )
 
 func (a *App) ensureSessions() *analysis.SessionStore {
@@ -12,6 +13,14 @@ func (a *App) ensureSessions() *analysis.SessionStore {
 		a.sessions = analysis.NewSessionStore()
 	}
 	return a.sessions
+}
+
+func (a *App) loadDeckTagRefs(ctx context.Context, rows []cards.DeckCard) (map[string][]analysis.TagRef, error) {
+	all, err := a.service.GetTagsByOracleID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return analysis.TagRefsForDeck(rows, all), nil
 }
 
 // ListFormatTargets returns deck size presets for analysis UI.
@@ -33,13 +42,32 @@ func (a *App) AnalyzeDeckDraw(req analysis.DeckDrawAnalysisRequest) (analysis.De
 	return analysis.AnalyzeDeckDraw(rows, req)
 }
 
+// AnalyzeDeckTags runs tag breakdown draw odds for a deck.
+func (a *App) AnalyzeDeckTags(req analysis.DeckTagAnalysisRequest) (analysis.DeckTagAnalysisResult, error) {
+	ctx := context.Background()
+	rows, err := a.service.ListDeckCards(ctx, req.DeckID)
+	if err != nil {
+		return analysis.DeckTagAnalysisResult{}, err
+	}
+	tagsByOracle, err := a.loadDeckTagRefs(ctx, rows)
+	if err != nil {
+		return analysis.DeckTagAnalysisResult{}, err
+	}
+	return analysis.AnalyzeDeckTags(rows, tagsByOracle, req)
+}
+
 // StartDeckSimulation creates a session and draws an opening hand.
-func (a *App) StartDeckSimulation(deckID int64, formatTarget string, oracleFocus string, minLands int) (analysis.SimulationState, error) {
-	rows, err := a.service.ListDeckCards(context.Background(), deckID)
+func (a *App) StartDeckSimulation(deckID int64, formatTarget string, oracleFocus string, tagFocus int64, minLands int) (analysis.SimulationState, error) {
+	ctx := context.Background()
+	rows, err := a.service.ListDeckCards(ctx, deckID)
 	if err != nil {
 		return analysis.SimulationState{}, err
 	}
-	sim := analysis.NewSimulation(deckID, formatTarget, rows, oracleFocus, minLands)
+	tagsByOracle, err := a.loadDeckTagRefs(ctx, rows)
+	if err != nil {
+		return analysis.SimulationState{}, err
+	}
+	sim := analysis.NewSimulation(deckID, formatTarget, rows, tagsByOracle, oracleFocus, tagFocus, minLands)
 	if err := sim.NewOpening(); err != nil {
 		return analysis.SimulationState{}, err
 	}
@@ -102,6 +130,16 @@ func (a *App) SimSetOracleFocus(sessionID string, oracleID string) (analysis.Sim
 		return analysis.SimulationState{}, err
 	}
 	sim.SetOracleFocus(oracleID)
+	return sim.State(sessionID), nil
+}
+
+// SimSetTagFocus updates which tag next-draw stats use.
+func (a *App) SimSetTagFocus(sessionID string, tagID int64) (analysis.SimulationState, error) {
+	sim, err := a.getSimulation(sessionID)
+	if err != nil {
+		return analysis.SimulationState{}, err
+	}
+	sim.SetTagFocus(tagID)
 	return sim.State(sessionID), nil
 }
 

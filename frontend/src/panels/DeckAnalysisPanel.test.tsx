@@ -97,4 +97,27 @@ describe("DeckAnalysisPanel", () => {
       expect(cardResult.querySelector("strong")?.textContent).toBe("50.0%");
     });
   });
+
+  it("shows empty tags state on calculators tab when deck has no tagged cards", async () => {
+    const { api } = createFakeBackendTestKit({
+      ListDecks: vi.fn().mockResolvedValue([{ id: 1, name: "Burn" }]),
+      ListDeckCards: vi.fn().mockResolvedValue([
+        {
+          card: { oracleId: "oracle-bolt", name: "Lightning Bolt", scryfallUri: "https://example.test/bolt", typeLine: "Instant" },
+          quantity: 4
+        }
+      ]),
+      AnalyzeDeckTags: vi.fn().mockResolvedValue({
+        populationN: 60,
+        deckTotal: 4,
+        tags: null
+      })
+    });
+    render(<DeckAnalysisPanel api={api} setMessage={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Calculators" }));
+
+    expect(await screen.findByText("No tagged cards in deck")).toBeInTheDocument();
+  });
 });

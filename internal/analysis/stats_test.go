@@ -11,7 +11,7 @@ func TestNextDrawLandProb(t *testing.T) {
 		{Card: cards.CardIdentity{OracleID: "b", Name: "Mountain", TypeLine: "Basic Land — Mountain"}, Quantity: 20},
 		{Card: cards.CardIdentity{OracleID: "a", Name: "Bolt", TypeLine: "Instant"}, Quantity: 40},
 	}
-	pool := BuildDeckPool(rows, FormatStandard)
+	pool := BuildDeckPool(rows, FormatStandard, nil)
 	// 7 lands in hand of 20-land deck: 13 lands / 53 library
 	hand := make([]SimulationCard, 7)
 	for i := range hand {

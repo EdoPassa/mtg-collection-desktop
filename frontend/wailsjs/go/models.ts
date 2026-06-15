@@ -56,6 +56,92 @@ export namespace analysis {
 	        this.sizeWarning = source["sizeWarning"];
 	    }
 	}
+	export class DeckTagAnalysisRequest {
+	    deckId: number;
+	    formatTarget: string;
+	    sampleSize: number;
+	    minTagCards: number;
+	    tagFocus: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckTagAnalysisRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.deckId = source["deckId"];
+	        this.formatTarget = source["formatTarget"];
+	        this.sampleSize = source["sampleSize"];
+	        this.minTagCards = source["minTagCards"];
+	        this.tagFocus = source["tagFocus"];
+	    }
+	}
+	export class TagDeckStat {
+	    tagId: number;
+	    name: string;
+	    color?: string;
+	    copiesInDeck: number;
+	    copiesInLibrary?: number;
+	    nextDrawProb?: number;
+	    nextDrawProbFormatted?: string;
+	    sampleProb: number;
+	    sampleProbFormatted: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TagDeckStat(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tagId = source["tagId"];
+	        this.name = source["name"];
+	        this.color = source["color"];
+	        this.copiesInDeck = source["copiesInDeck"];
+	        this.copiesInLibrary = source["copiesInLibrary"];
+	        this.nextDrawProb = source["nextDrawProb"];
+	        this.nextDrawProbFormatted = source["nextDrawProbFormatted"];
+	        this.sampleProb = source["sampleProb"];
+	        this.sampleProbFormatted = source["sampleProbFormatted"];
+	    }
+	}
+	export class DeckTagAnalysisResult {
+	    populationN: number;
+	    deckTotal: number;
+	    tags: TagDeckStat[];
+	    focus?: TagDeckStat;
+	    sizeWarning?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeckTagAnalysisResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.populationN = source["populationN"];
+	        this.deckTotal = source["deckTotal"];
+	        this.tags = this.convertValues(source["tags"], TagDeckStat);
+	        this.focus = this.convertValues(source["focus"], TagDeckStat);
+	        this.sizeWarning = source["sizeWarning"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class DrawStats {
 	    landsInHand: number;
 	    libraryRemaining: number;
@@ -64,9 +150,13 @@ export namespace analysis {
 	    nextDrawCardProb: number;
 	    nextDrawCardProbFormatted: string;
 	    oracleIdUsed?: string;
+	    nextDrawTagProb: number;
+	    nextDrawTagProbFormatted: string;
+	    tagIdUsed?: number;
 	    afterOneDrawLandsProb: number;
 	    afterOneDrawLandsProbFormatted: string;
 	    minLandsThreshold: number;
+	    tags?: TagDeckStat[];
 	
 	    static createFrom(source: any = {}) {
 	        return new DrawStats(source);
@@ -81,10 +171,32 @@ export namespace analysis {
 	        this.nextDrawCardProb = source["nextDrawCardProb"];
 	        this.nextDrawCardProbFormatted = source["nextDrawCardProbFormatted"];
 	        this.oracleIdUsed = source["oracleIdUsed"];
+	        this.nextDrawTagProb = source["nextDrawTagProb"];
+	        this.nextDrawTagProbFormatted = source["nextDrawTagProbFormatted"];
+	        this.tagIdUsed = source["tagIdUsed"];
 	        this.afterOneDrawLandsProb = source["afterOneDrawLandsProb"];
 	        this.afterOneDrawLandsProbFormatted = source["afterOneDrawLandsProbFormatted"];
 	        this.minLandsThreshold = source["minLandsThreshold"];
+	        this.tags = this.convertValues(source["tags"], TagDeckStat);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class FormatTarget {
 	    id: string;

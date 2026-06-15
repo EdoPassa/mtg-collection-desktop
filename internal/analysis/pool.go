@@ -25,6 +25,14 @@ type poolSlot struct {
 	card     cards.CardIdentity
 	isLand   bool
 	isBlank  bool
+	tagIDs   []int64
+}
+
+// TagRef identifies a collection tag for deck analysis.
+type TagRef struct {
+	ID    int64  `json:"tagId"`
+	Name  string `json:"name"`
+	Color string `json:"color,omitempty"`
 }
 
 // DeckPool is an expanded mainboard for simulation and analysis.
@@ -35,28 +43,41 @@ type DeckPool struct {
 	TargetSize    int
 	DetectedLands int
 	OracleCounts  map[string]int
+	TagCounts     map[int64]int
+	TagMeta       map[int64]TagRef
 }
 
 // BuildDeckPool expands mainboard cards and pads to population N.
-func BuildDeckPool(rows []cards.DeckCard, formatTarget string) DeckPool {
+// tagsByOracle maps oracle_id to tags on that card; nil is treated as empty.
+func BuildDeckPool(rows []cards.DeckCard, formatTarget string, tagsByOracle map[string][]TagRef) DeckPool {
 	target := FormatTargetSize(formatTarget)
 	mainboard := filterMainboard(rows)
 	deckTotal := totalQuantity(mainboard)
 
 	var slots []poolSlot
 	oracleCounts := make(map[string]int)
+	tagCounts := make(map[int64]int)
+	tagMeta := make(map[int64]TagRef)
 	detectedLands := 0
 	slotIdx := 0
 
 	for _, row := range mainboard {
 		isLand := cards.IsLandTypeLine(row.Card.TypeLine)
+		tags := tagsByOracle[row.Card.OracleID]
 		for i := 0; i < row.Quantity; i++ {
 			slotIdx++
+			slotTags := make([]int64, 0, len(tags))
+			for _, tag := range tags {
+				slotTags = append(slotTags, tag.ID)
+				tagCounts[tag.ID]++
+				tagMeta[tag.ID] = tag
+			}
 			slots = append(slots, poolSlot{
 				slotID:   fmt.Sprintf("s%d", slotIdx),
 				oracleID: row.Card.OracleID,
 				card:     row.Card,
 				isLand:   isLand,
+				tagIDs:   slotTags,
 			})
 			oracleCounts[row.Card.OracleID]++
 			if isLand {
@@ -86,6 +107,8 @@ func BuildDeckPool(rows []cards.DeckCard, formatTarget string) DeckPool {
 		TargetSize:    target,
 		DetectedLands: detectedLands,
 		OracleCounts:  oracleCounts,
+		TagCounts:     tagCounts,
+		TagMeta:       tagMeta,
 	}
 }
 

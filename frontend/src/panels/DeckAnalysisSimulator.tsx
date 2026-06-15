@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { BackendApi, DeckCard, SimulationState } from "../backend";
+import type { BackendApi, CollectionTag, DeckCard, SimulationState } from "../backend";
 import { CardImage } from "../components/CardImage";
 import { EmptyState } from "../components/EmptyState";
 import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
+import { TagBadge } from "../components/TagBadge";
 
 type Props = {
   api: BackendApi;
@@ -13,7 +14,13 @@ type Props = {
   mainboardCards: DeckCard[];
   selectedOracleId: string;
   onOracleChange: (oracleId: string) => void;
+  selectedTagId: number;
+  onTagChange: (tagId: number) => void;
 };
+
+function tagFromStat(stat: { tagId: number; name: string; color?: string }): CollectionTag {
+  return { id: stat.tagId, name: stat.name, color: stat.color };
+}
 
 export function DeckAnalysisSimulator({
   api,
@@ -22,7 +29,9 @@ export function DeckAnalysisSimulator({
   formatTarget,
   mainboardCards,
   selectedOracleId,
-  onOracleChange
+  onOracleChange,
+  selectedTagId,
+  onTagChange
 }: Props) {
   const [sim, setSim] = useState<SimulationState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,7 +56,7 @@ export function DeckAnalysisSimulator({
     sessionRef.current = undefined;
     setLoading(true);
     try {
-      const next = await api.StartDeckSimulation(deckId, formatTarget, selectedOracleId, 2);
+      const next = await api.StartDeckSimulation(deckId, formatTarget, selectedOracleId, selectedTagId, 2);
       sessionRef.current = next.sessionId;
       setSim(next);
     } catch (error) {
@@ -56,7 +65,7 @@ export function DeckAnalysisSimulator({
     } finally {
       setLoading(false);
     }
-  }, [api, deckId, endSession, formatTarget, selectedOracleId, setMessage]);
+  }, [api, deckId, endSession, formatTarget, selectedOracleId, selectedTagId, setMessage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,7 +77,7 @@ export function DeckAnalysisSimulator({
       }
       setLoading(true);
       try {
-        const next = await api.StartDeckSimulation(deckId, formatTarget, selectedOracleId, 2);
+        const next = await api.StartDeckSimulation(deckId, formatTarget, selectedOracleId, selectedTagId, 2);
         if (cancelled) {
           await api.EndDeckSimulation(next.sessionId);
           return;
@@ -91,7 +100,7 @@ export function DeckAnalysisSimulator({
       void endSession(sessionRef.current);
       sessionRef.current = undefined;
     };
-    // Oracle focus changes are handled separately; restarting here races with SimSetOracleFocus.
+    // Oracle/tag focus changes are handled separately; restarting here races with SimSet*Focus.
   }, [api, deckId, endSession, formatTarget, setMessage]);
 
   useEffect(() => {
@@ -126,6 +135,38 @@ export function DeckAnalysisSimulator({
     };
   }, [api, selectedOracleId, setMessage, sim?.sessionId, sim?.stats.oracleIdUsed]);
 
+  useEffect(() => {
+    const sessionId = sim?.sessionId;
+    if (!sessionId || selectedTagId === (sim.stats.tagIdUsed ?? 0)) {
+      return;
+    }
+    if (sessionRef.current !== sessionId) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await api.SimSetTagFocus(sessionId, selectedTagId);
+        if (cancelled || sessionRef.current !== sessionId) {
+          return;
+        }
+        setSim(next);
+      } catch (error) {
+        if (cancelled || sessionRef.current !== sessionId) {
+          return;
+        }
+        const message = String(error);
+        if (message.includes("simulation session not found")) {
+          return;
+        }
+        setMessage(message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api, selectedTagId, setMessage, sim?.sessionId, sim?.stats.tagIdUsed]);
+
   async function runAction(action: () => Promise<SimulationState>) {
     setLoading(true);
     try {
@@ -139,6 +180,8 @@ export function DeckAnalysisSimulator({
   }
 
   const awaitingBottom = sim?.phase === "awaiting_bottom";
+  const tagStats = sim?.stats.tags ?? [];
+  const focusedTag = tagStats.find((stat) => stat.tagId === selectedTagId);
 
   return (
     <div className="analysis-simulator">
@@ -233,6 +276,24 @@ export function DeckAnalysisSimulator({
             </label>
           )}
 
+          {tagStats.length > 0 && (
+            <label className="analysis-field">
+              Next-draw stats for tag
+              <Select
+                aria-label="Tag for next-draw probability"
+                value={selectedTagId}
+                onChange={(event) => onTagChange(Number(event.target.value) || 0)}
+              >
+                <option value={0}>None</option>
+                {tagStats.map((stat) => (
+                  <option key={stat.tagId} value={stat.tagId}>
+                    {stat.name} ({stat.copiesInLibrary ?? 0} in library)
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
+
           <article className="analysis-card" aria-live="polite">
             <h3>Next draw</h3>
             <p className="analysis-result">
@@ -243,6 +304,12 @@ export function DeckAnalysisSimulator({
                 P(next card is selected card): <strong>{sim.stats.nextDrawCardProbFormatted}</strong>
               </p>
             )}
+            {selectedTagId > 0 && focusedTag && (
+              <p className="analysis-result">
+                P(next card has tag &ldquo;{focusedTag.name}&rdquo;):{" "}
+                <strong>{sim.stats.nextDrawTagProbFormatted}</strong>
+              </p>
+            )}
             <p className="analysis-result">
               P(at least {sim.stats.minLandsThreshold} lands after one more draw):{" "}
               <strong>{sim.stats.afterOneDrawLandsProbFormatted}</strong>
@@ -250,6 +317,26 @@ export function DeckAnalysisSimulator({
             <p className="analysis-hint">
               Lands in hand: {sim.stats.landsInHand}. Library remaining: {sim.stats.libraryRemaining}.
             </p>
+            {tagStats.length > 0 && (
+              <>
+                <h4 className="analysis-subheading">Tags in library</h4>
+                <ul className="analysis-tag-list" aria-label="Per-tag next draw odds">
+                  {tagStats.map((stat) => (
+                    <li key={stat.tagId}>
+                      <button
+                        type="button"
+                        className={`analysis-tag-row${selectedTagId === stat.tagId ? " analysis-tag-row--active" : ""}`}
+                        onClick={() => onTagChange(selectedTagId === stat.tagId ? 0 : stat.tagId)}
+                      >
+                        <TagBadge tag={tagFromStat(stat)} />
+                        <span className="analysis-tag-copies">{stat.copiesInLibrary ?? 0} in library</span>
+                        <span className="analysis-tag-prob">{stat.nextDrawProbFormatted ?? "—"}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </article>
         </>
       )}

@@ -16,6 +16,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
   const [formatTargets, setFormatTargets] = useState<FormatTarget[]>([]);
   const [formatTarget, setFormatTarget] = useState("");
   const [selectedOracleId, setSelectedOracleId] = useState("");
+  const [selectedTagId, setSelectedTagId] = useState(0);
   const [view, setView] = useState<AnalysisView>("simulator");
 
   const selectedFormat = formatTargets.find((format) => format.id === formatTarget) ?? null;
@@ -42,6 +43,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
         setSelectedId(null);
         setCards([]);
         setSelectedOracleId("");
+        setSelectedTagId(0);
       }
     } catch (error) {
       setMessage(String(error));
@@ -58,6 +60,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
       }
       if (next.length === 0) {
         setSelectedOracleId("");
+        setSelectedTagId(0);
       }
     } catch (error) {
       setMessage(String(error));
@@ -174,6 +177,8 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                     mainboardCards={mainboardCards}
                     selectedOracleId={selectedOracleId}
                     onOracleChange={setSelectedOracleId}
+                    selectedTagId={selectedTagId}
+                    onTagChange={setSelectedTagId}
                   />
                 ) : (
                   <DeckAnalysisCalculators
@@ -183,6 +188,8 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                     cards={cards}
                     formatTarget={formatTarget}
                     formatTargetSize={selectedFormat.size}
+                    selectedTagId={selectedTagId}
+                    onTagChange={setSelectedTagId}
                   />
                 )}
               </div>

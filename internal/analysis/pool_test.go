@@ -11,7 +11,7 @@ func TestBuildDeckPoolPadsToTarget(t *testing.T) {
 		{Card: cards.CardIdentity{OracleID: "a", Name: "Bolt", TypeLine: "Instant"}, Quantity: 4},
 		{Card: cards.CardIdentity{OracleID: "b", Name: "Mountain", TypeLine: "Basic Land — Mountain"}, Quantity: 20},
 	}
-	pool := BuildDeckPool(rows, FormatStandard)
+	pool := BuildDeckPool(rows, FormatStandard, nil)
 	if pool.DeckTotal != 24 {
 		t.Fatalf("deck total: %d", pool.DeckTotal)
 	}

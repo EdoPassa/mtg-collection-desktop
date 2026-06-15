@@ -32,6 +32,9 @@ export type HypergeometricRequest = Plain<analysis.HypergeometricRequest>;
 export type HypergeometricResult = Plain<analysis.HypergeometricResult>;
 export type DeckDrawAnalysisRequest = Plain<analysis.DeckDrawAnalysisRequest>;
 export type DeckDrawAnalysisResult = Plain<analysis.DeckDrawAnalysisResult>;
+export type DeckTagAnalysisRequest = Plain<analysis.DeckTagAnalysisRequest>;
+export type DeckTagAnalysisResult = Plain<analysis.DeckTagAnalysisResult>;
+export type TagDeckStat = Plain<analysis.TagDeckStat>;
 export type SimulationState = Plain<analysis.SimulationState>;
 export type SimulationCard = Plain<analysis.SimulationCard>;
 export type DrawStats = Plain<analysis.DrawStats>;
@@ -76,10 +79,12 @@ export type BackendApi = {
   FormatMissingDecklist(rows: DeckCompareRow[]): Promise<string>;
   Hypergeometric(req: HypergeometricRequest): Promise<HypergeometricResult>;
   AnalyzeDeckDraw(req: DeckDrawAnalysisRequest): Promise<DeckDrawAnalysisResult>;
+  AnalyzeDeckTags(req: DeckTagAnalysisRequest): Promise<DeckTagAnalysisResult>;
   StartDeckSimulation(
     deckID: number,
     formatTarget: string,
     oracleFocus: string,
+    tagFocus: number,
     minLands: number
   ): Promise<SimulationState>;
   SimNewOpening(sessionID: string): Promise<SimulationState>;
@@ -87,6 +92,7 @@ export type BackendApi = {
   SimPutOnBottom(sessionID: string, slotID: string): Promise<SimulationState>;
   SimDrawCard(sessionID: string): Promise<SimulationState>;
   SimSetOracleFocus(sessionID: string, oracleID: string): Promise<SimulationState>;
+  SimSetTagFocus(sessionID: string, tagID: number): Promise<SimulationState>;
   EndDeckSimulation(sessionID: string): Promise<void>;
 };
 
@@ -148,14 +154,18 @@ export function createBackendApi(overrides: Partial<WailsBindings> = {}): Backen
     Hypergeometric: (req) => bindings.Hypergeometric(req as analysis.HypergeometricRequest) as Promise<HypergeometricResult>,
     AnalyzeDeckDraw: (req) =>
       bindings.AnalyzeDeckDraw(req as analysis.DeckDrawAnalysisRequest) as Promise<DeckDrawAnalysisResult>,
-    StartDeckSimulation: (deckID, formatTarget, oracleFocus, minLands) =>
-      bindings.StartDeckSimulation(deckID, formatTarget, oracleFocus, minLands) as Promise<SimulationState>,
+    AnalyzeDeckTags: (req) =>
+      bindings.AnalyzeDeckTags(req as analysis.DeckTagAnalysisRequest) as Promise<DeckTagAnalysisResult>,
+    StartDeckSimulation: (deckID, formatTarget, oracleFocus, tagFocus, minLands) =>
+      bindings.StartDeckSimulation(deckID, formatTarget, oracleFocus, tagFocus, minLands) as Promise<SimulationState>,
     SimNewOpening: (sessionID) => bindings.SimNewOpening(sessionID) as Promise<SimulationState>,
     SimMulligan: (sessionID) => bindings.SimMulligan(sessionID) as Promise<SimulationState>,
     SimPutOnBottom: (sessionID, slotID) => bindings.SimPutOnBottom(sessionID, slotID) as Promise<SimulationState>,
     SimDrawCard: (sessionID) => bindings.SimDrawCard(sessionID) as Promise<SimulationState>,
     SimSetOracleFocus: (sessionID, oracleID) =>
       bindings.SimSetOracleFocus(sessionID, oracleID) as Promise<SimulationState>,
+    SimSetTagFocus: (sessionID, tagID) =>
+      bindings.SimSetTagFocus(sessionID, tagID) as Promise<SimulationState>,
     EndDeckSimulation: bindings.EndDeckSimulation
   };
 }

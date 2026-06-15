@@ -15,9 +15,10 @@ func invalidAnalysisInput(msg string) error {
 
 // RemainingCounts tracks library composition after cards are in hand or on bottom.
 type RemainingCounts struct {
-	Total       int
-	Lands       int
-	ByOracle    map[string]int
+	Total    int
+	Lands    int
+	ByOracle map[string]int
+	ByTag    map[int64]int
 }
 
 func countRemaining(pool DeckPool, hand []SimulationCard, bottom []SimulationCard) RemainingCounts {
@@ -47,7 +48,7 @@ func countRemaining(pool DeckPool, hand []SimulationCard, bottom []SimulationCar
 		}
 	}
 
-	rem := RemainingCounts{ByOracle: make(map[string]int)}
+	rem := RemainingCounts{ByOracle: make(map[string]int), ByTag: make(map[int64]int)}
 	for _, s := range pool.Slots {
 		if inPlay[s.slotID] > 0 {
 			inPlay[s.slotID]--
@@ -63,6 +64,9 @@ func countRemaining(pool DeckPool, hand []SimulationCard, bottom []SimulationCar
 		if s.oracleID != "" {
 			rem.ByOracle[s.oracleID]++
 		}
+		for _, tagID := range s.tagIDs {
+			rem.ByTag[tagID]++
+		}
 	}
 	return rem
 }
@@ -73,6 +77,14 @@ func NextDrawLandProb(rem RemainingCounts) float64 {
 		return 0
 	}
 	return float64(rem.Lands) / float64(rem.Total)
+}
+
+// NextDrawTagProb is P(next card has tag) from remaining library.
+func NextDrawTagProb(rem RemainingCounts, tagID int64) float64 {
+	if rem.Total <= 0 || tagID <= 0 {
+		return 0
+	}
+	return float64(rem.ByTag[tagID]) / float64(rem.Total)
 }
 
 // NextDrawCardProb is P(next card is a specific oracle) from remaining library.
@@ -95,7 +107,7 @@ func ProbAtLeastLandsInHandAfterDraws(rem RemainingCounts, landsInHand, minLands
 	return AtLeast(rem.Total, rem.Lands, draws, need)
 }
 
-func computeDrawStats(pool DeckPool, hand, bottom []SimulationCard, oracleID string, minLands int) DrawStats {
+func computeDrawStats(pool DeckPool, hand, bottom []SimulationCard, oracleID string, tagFocus int64, minLands int) DrawStats {
 	rem := countRemaining(pool, hand, bottom)
 	landsInHand := 0
 	for _, c := range hand {
@@ -109,6 +121,10 @@ func computeDrawStats(pool DeckPool, hand, bottom []SimulationCard, oracleID str
 	if oracleID == "" {
 		nextCard = 0
 	}
+	nextTag := NextDrawTagProb(rem, tagFocus)
+	if tagFocus <= 0 {
+		nextTag = 0
+	}
 
 	afterOne := ProbAtLeastLandsInHandAfterDraws(rem, landsInHand, minLands, 1)
 
@@ -120,9 +136,13 @@ func computeDrawStats(pool DeckPool, hand, bottom []SimulationCard, oracleID str
 		NextDrawCardProb:               nextCard,
 		NextDrawCardProbFormatted:      FormatProbability(nextCard),
 		OracleIDUsed:                   oracleID,
+		NextDrawTagProb:                nextTag,
+		NextDrawTagProbFormatted:       FormatProbability(nextTag),
+		TagIDUsed:                      tagFocus,
 		AfterOneDrawLandsProb:          afterOne,
 		AfterOneDrawLandsProbFormatted: FormatProbability(afterOne),
 		MinLandsThreshold:              minLands,
+		Tags:                           tagStatsFromRemaining(pool, rem, 1, 1),
 	}
 }
 
@@ -149,7 +169,7 @@ func ComputeHypergeometric(req HypergeometricRequest) (HypergeometricResult, err
 
 // AnalyzeDeckDraw computes deck-aware hypergeometric odds.
 func AnalyzeDeckDraw(rows []cards.DeckCard, req DeckDrawAnalysisRequest) (DeckDrawAnalysisResult, error) {
-	pool := BuildDeckPool(rows, req.FormatTarget)
+	pool := BuildDeckPool(rows, req.FormatTarget, nil)
 	if pool.PopulationN <= 0 {
 		return DeckDrawAnalysisResult{}, invalidAnalysisInput("deck has no cards")
 	}

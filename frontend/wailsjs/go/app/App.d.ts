@@ -9,6 +9,8 @@ export function AddCardToDeckByName(arg1:number,arg2:string,arg3:number):Promise
 
 export function AnalyzeDeckDraw(arg1:analysis.DeckDrawAnalysisRequest):Promise<analysis.DeckDrawAnalysisResult>;
 
+export function AnalyzeDeckTags(arg1:analysis.DeckTagAnalysisRequest):Promise<analysis.DeckTagAnalysisResult>;
+
 export function BuildDeckFromCompare(arg1:collection.BuildDeckInput):Promise<number>;
 
 export function CommitImport(arg1:Array<collection.ResolvedLine>):Promise<void>;
@@ -83,6 +85,8 @@ export function SimPutOnBottom(arg1:string,arg2:string):Promise<analysis.Simulat
 
 export function SimSetOracleFocus(arg1:string,arg2:string):Promise<analysis.SimulationState>;
 
-export function StartDeckSimulation(arg1:number,arg2:string,arg3:string,arg4:number):Promise<analysis.SimulationState>;
+export function SimSetTagFocus(arg1:string,arg2:number):Promise<analysis.SimulationState>;
+
+export function StartDeckSimulation(arg1:number,arg2:string,arg3:string,arg4:number,arg5:number):Promise<analysis.SimulationState>;
 
 export function UpdateCollectionTagColor(arg1:number,arg2:string):Promise<void>;

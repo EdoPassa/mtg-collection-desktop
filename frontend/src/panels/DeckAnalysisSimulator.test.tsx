@@ -61,6 +61,8 @@ describe("DeckAnalysisSimulator", () => {
         mainboardCards={mainboard}
         selectedOracleId=""
         onOracleChange={vi.fn()}
+        selectedTagId={0}
+        onTagChange={vi.fn()}
       />
     );
 
@@ -76,6 +78,8 @@ describe("DeckAnalysisSimulator", () => {
         mainboardCards={mainboard}
         selectedOracleId="oracle-bolt"
         onOracleChange={vi.fn()}
+        selectedTagId={0}
+        onTagChange={vi.fn()}
       />
     );
 
@@ -165,6 +169,8 @@ describe("DeckAnalysisSimulator", () => {
         mainboardCards={mainboard}
         selectedOracleId="oracle-bolt"
         onOracleChange={vi.fn()}
+        selectedTagId={0}
+        onTagChange={vi.fn()}
       />
     );
 

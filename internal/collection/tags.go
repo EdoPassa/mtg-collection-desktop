@@ -35,6 +35,11 @@ func (s *Service) SetCardTags(ctx context.Context, oracleID string, tagIDs []int
 	return s.store.SetCardTags(ctx, strings.TrimSpace(oracleID), tagIDs)
 }
 
+// GetTagsByOracleID returns all card tags keyed by oracle_id.
+func (s *Service) GetTagsByOracleID(ctx context.Context) (map[string][]cards.CollectionTag, error) {
+	return s.store.GetTagsByOracleID(ctx)
+}
+
 func (s *Service) attachTagsToCollectionItems(ctx context.Context, rows []cards.CollectionItem) error {
 	if len(rows) == 0 {
 		return nil
