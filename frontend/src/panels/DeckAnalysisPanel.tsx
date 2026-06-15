@@ -78,7 +78,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
   }, [selectedId]);
 
   return (
-    <section className="panel" aria-label="Deck Analysis">
+    <section className="panel analysis-panel" aria-label="Deck Analysis">
       <p className="analysis-intro">
         Simulate opening hands and estimate draw odds with hypergeometric math on the server. Only mainboard cards count;
         sideboard is ignored.
@@ -160,26 +160,32 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                 </button>
               </div>
 
-              {view === "simulator" ? (
-                <DeckAnalysisSimulator
-                  api={api}
-                  setMessage={setMessage}
-                  deckId={selectedDeck.id}
-                  formatTarget={formatTarget}
-                  mainboardCards={mainboardCards}
-                  selectedOracleId={selectedOracleId}
-                  onOracleChange={setSelectedOracleId}
-                />
-              ) : (
-                <DeckAnalysisCalculators
-                  api={api}
-                  setMessage={setMessage}
-                  deck={selectedDeck}
-                  cards={cards}
-                  formatTarget={formatTarget}
-                  formatTargetSize={selectedFormat.size}
-                />
-              )}
+              <div
+                className="analysis-scroll-region"
+                tabIndex={0}
+                aria-label={view === "simulator" ? "Simulator content" : "Calculator content"}
+              >
+                {view === "simulator" ? (
+                  <DeckAnalysisSimulator
+                    api={api}
+                    setMessage={setMessage}
+                    deckId={selectedDeck.id}
+                    formatTarget={formatTarget}
+                    mainboardCards={mainboardCards}
+                    selectedOracleId={selectedOracleId}
+                    onOracleChange={setSelectedOracleId}
+                  />
+                ) : (
+                  <DeckAnalysisCalculators
+                    api={api}
+                    setMessage={setMessage}
+                    deck={selectedDeck}
+                    cards={cards}
+                    formatTarget={formatTarget}
+                    formatTargetSize={selectedFormat.size}
+                  />
+                )}
+              </div>
             </>
           )}
         </div>
