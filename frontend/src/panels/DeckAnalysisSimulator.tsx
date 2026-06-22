@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { BackendApi, CollectionTag, DeckCard, SimulationCard, SimulationState } from "../backend";
 import { CardImage } from "../components/CardImage";
 import { EmptyState } from "../components/EmptyState";
+import { ProbabilityGauge } from "../components/ProbabilityGauge";
 import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
 import { TagBadge } from "../components/TagBadge";
@@ -233,6 +234,51 @@ export function DeckAnalysisSimulator({
     .map((slotId) => handBySlot.get(slotId))
     .filter((card): card is SimulationCard => card !== undefined);
 
+  const cardEls = useRef(new Map<string, HTMLElement>());
+  const prevRects = useRef(new Map<string, DOMRect>());
+  const registerCard = useCallback((slotId: string, el: HTMLElement | null) => {
+    if (el) {
+      cardEls.current.set(slotId, el);
+    } else {
+      cardEls.current.delete(slotId);
+    }
+  }, []);
+
+  const orderKey = orderedHand.map((card) => card.slotId).join("|");
+
+  // FLIP: glide cards to their new slot when the hand is reordered, rather than jumping.
+  // Newly dealt/drawn cards have no previous rect, so they fall through to the deal-in
+  // animation instead.
+  useLayoutEffect(() => {
+    const reduceMotion =
+      typeof window !== "undefined" && typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        : false;
+    const newRects = new Map<string, DOMRect>();
+    cardEls.current.forEach((el, slotId) => newRects.set(slotId, el.getBoundingClientRect()));
+    if (!reduceMotion && typeof requestAnimationFrame === "function") {
+      newRects.forEach((newRect, slotId) => {
+        const oldRect = prevRects.current.get(slotId);
+        const el = cardEls.current.get(slotId);
+        if (!oldRect || !el) {
+          return;
+        }
+        const dx = oldRect.left - newRect.left;
+        const dy = oldRect.top - newRect.top;
+        if (dx === 0 && dy === 0) {
+          return;
+        }
+        el.style.transition = "none";
+        el.style.transform = `translate(${dx}px, ${dy}px)`;
+        requestAnimationFrame(() => {
+          el.style.transition = "";
+          el.style.transform = "";
+        });
+      });
+    }
+    prevRects.current = newRects;
+  }, [orderKey]);
+
   function handleHandDrop(targetSlotId: string, sourceSlotId: string | null) {
     if (!sourceSlotId || sourceSlotId === targetSlotId) {
       return;
@@ -283,10 +329,23 @@ export function DeckAnalysisSimulator({
 
       {sim && (
         <>
-          <div className="stat-row">
+          <div className="sim-summary">
             <Stat label="In hand" value={sim.hand.length} />
             <Stat label="In library" value={sim.libraryCount} />
-            <Stat label="Mulligans" value={sim.mulliganCount} />
+            <div className="sim-mulligan" role="group" aria-label={`Mulligans taken: ${sim.mulliganCount}`}>
+              <span className="sim-mulligan-label">Mulligans</span>
+              <span className="sim-mulligan-track">
+                <span className="sim-mulligan-pips" aria-hidden="true">
+                  {Array.from({ length: Math.max(sim.mulliganCount, 3) }).map((_, index) => (
+                    <span
+                      key={index}
+                      className={`sim-mulligan-pip${index < sim.mulliganCount ? " sim-mulligan-pip--on" : ""}`}
+                    />
+                  ))}
+                </span>
+                <span className="sim-mulligan-count">{sim.mulliganCount}</span>
+              </span>
+            </div>
           </div>
 
           {!awaitingBottom && orderedHand.length > 1 && (
@@ -294,7 +353,8 @@ export function DeckAnalysisSimulator({
           )}
 
           <div className="sim-hand" aria-label="Opening hand">
-            {orderedHand.map((card) => {
+            {orderedHand.map((card, index) => {
+              const dealStyle = { ["--deal-i" as string]: index } as React.CSSProperties;
               const cardClassName = [
                 "sim-hand-card",
                 card.isLand ? "sim-hand-card--land" : "",
@@ -322,6 +382,8 @@ export function DeckAnalysisSimulator({
                 return (
                   <button
                     key={card.slotId}
+                    ref={(el) => registerCard(card.slotId, el)}
+                    style={dealStyle}
                     type="button"
                     className={cardClassName}
                     disabled={loading}
@@ -341,6 +403,8 @@ export function DeckAnalysisSimulator({
               return (
                 <div
                   key={card.slotId}
+                  ref={(el) => registerCard(card.slotId, el)}
+                  style={dealStyle}
                   className={cardClassName}
                   draggable={!loading}
                   aria-label={card.name}
@@ -414,6 +478,32 @@ export function DeckAnalysisSimulator({
 
           <article className="analysis-card" aria-live="polite">
             <h3>Next draw</h3>
+            <div className="gauge-row">
+              <ProbabilityGauge
+                value={sim.stats.nextDrawLandProb}
+                formatted={sim.stats.nextDrawLandProbFormatted}
+                label="Next = land"
+              />
+              {selectedOracleId && (
+                <ProbabilityGauge
+                  value={sim.stats.nextDrawCardProb}
+                  formatted={sim.stats.nextDrawCardProbFormatted}
+                  label="Next = card"
+                />
+              )}
+              {selectedTagId > 0 && focusedTag && (
+                <ProbabilityGauge
+                  value={sim.stats.nextDrawTagProb}
+                  formatted={sim.stats.nextDrawTagProbFormatted}
+                  label="Next = tag"
+                />
+              )}
+              <ProbabilityGauge
+                value={sim.stats.afterOneDrawLandsProb}
+                formatted={sim.stats.afterOneDrawLandsProbFormatted}
+                label={`≥${sim.stats.minLandsThreshold} lands +1`}
+              />
+            </div>
             <p className="analysis-result">
               P(next card is a land): <strong>{sim.stats.nextDrawLandProbFormatted}</strong>
             </p>

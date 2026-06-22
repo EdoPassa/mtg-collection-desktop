@@ -4,10 +4,11 @@ import { EmptyState } from "../components/EmptyState";
 import { Select } from "../components/Select";
 import { isMainboard } from "../lib/deckBoard";
 import { DeckAnalysisCalculators } from "./DeckAnalysisCalculators";
+import { DeckAnalysisOverview } from "./DeckAnalysisOverview";
 import { DeckAnalysisSimulator } from "./DeckAnalysisSimulator";
 import type { PanelProps } from "./types";
 
-type AnalysisView = "simulator" | "calculators";
+type AnalysisView = "overview" | "simulator" | "calculators";
 
 export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -17,7 +18,7 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
   const [formatTarget, setFormatTarget] = useState("");
   const [selectedOracleId, setSelectedOracleId] = useState("");
   const [selectedTagId, setSelectedTagId] = useState(0);
-  const [view, setView] = useState<AnalysisView>("simulator");
+  const [view, setView] = useState<AnalysisView>("overview");
 
   const selectedFormat = formatTargets.find((format) => format.id === formatTarget) ?? null;
   const selectedDeck = decks.find((deck) => deck.id === selectedId) ?? null;
@@ -146,6 +147,15 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
                 <button
                   type="button"
                   role="tab"
+                  aria-selected={view === "overview"}
+                  className={`analysis-tab${view === "overview" ? " analysis-tab--active" : ""}`}
+                  onClick={() => setView("overview")}
+                >
+                  Overview
+                </button>
+                <button
+                  type="button"
+                  role="tab"
                   aria-selected={view === "simulator"}
                   className={`analysis-tab${view === "simulator" ? " analysis-tab--active" : ""}`}
                   onClick={() => setView("simulator")}
@@ -166,9 +176,17 @@ export function DeckAnalysisPanel({ api, setMessage }: PanelProps) {
               <div
                 className="analysis-scroll-region"
                 tabIndex={0}
-                aria-label={view === "simulator" ? "Simulator content" : "Calculator content"}
+                aria-label={
+                  view === "overview"
+                    ? "Overview content"
+                    : view === "simulator"
+                      ? "Simulator content"
+                      : "Calculator content"
+                }
               >
-                {view === "simulator" ? (
+                {view === "overview" ? (
+                  <DeckAnalysisOverview deckId={selectedDeck.id} mainboardCards={mainboardCards} />
+                ) : view === "simulator" ? (
                   <DeckAnalysisSimulator
                     api={api}
                     setMessage={setMessage}

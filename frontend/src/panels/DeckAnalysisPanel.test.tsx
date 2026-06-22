@@ -59,9 +59,45 @@ describe("DeckAnalysisPanel", () => {
     render(<DeckAnalysisPanel api={api} setMessage={vi.fn()} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Simulator" }));
 
     expect(bindings.StartDeckSimulation).toHaveBeenCalled();
     expect(await screen.findByText(/P\(next card is a land\)/)).toBeInTheDocument();
+  });
+
+  it("shows the mana curve overview by default when a deck is selected", async () => {
+    const { api, bindings } = createFakeBackendTestKit({
+      ListDecks: vi.fn().mockResolvedValue([{ id: 1, name: "Burn" }]),
+      ListDeckCards: vi.fn().mockResolvedValue([
+        {
+          card: {
+            oracleId: "oracle-bolt",
+            name: "Lightning Bolt",
+            scryfallUri: "https://example.test/bolt",
+            typeLine: "Instant",
+            manaCost: "{R}",
+            colorIdentity: ["R"]
+          },
+          quantity: 4
+        },
+        {
+          card: {
+            oracleId: "oracle-mountain",
+            name: "Mountain",
+            scryfallUri: "https://example.test/mountain",
+            typeLine: "Basic Land — Mountain"
+          },
+          quantity: 20
+        }
+      ])
+    });
+    render(<DeckAnalysisPanel api={api} setMessage={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Burn" }));
+
+    expect(await screen.findByRole("img", { name: /Mana curve/i })).toBeInTheDocument();
+    expect(screen.getByText("Avg mana value")).toBeInTheDocument();
+    expect(bindings.StartDeckSimulation).not.toHaveBeenCalled();
   });
 
   it("shows draw odds on calculators tab", async () => {

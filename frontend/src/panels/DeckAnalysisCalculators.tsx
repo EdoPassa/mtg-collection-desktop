@@ -10,6 +10,7 @@ import type {
   TagDeckStat
 } from "../backend";
 import { EmptyState } from "../components/EmptyState";
+import { ProbabilityGauge } from "../components/ProbabilityGauge";
 import { Select } from "../components/Select";
 import { Stat } from "../components/Stat";
 import { TagBadge } from "../components/TagBadge";
@@ -258,10 +259,17 @@ export function DeckAnalysisCalculators({
                 onChange={(event) => setMinCardCopies(Math.max(1, Number(event.target.value) || 1))}
               />
             </label>
-            <p className="analysis-result" aria-live="polite">
-              Chance to draw at least {minCardCopies} by seeing {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
-              <strong>{deckResult?.cardProbabilityFormatted ?? "—"}</strong>
-            </p>
+            <div className="gauge-result">
+              <ProbabilityGauge
+                value={deckResult?.cardProbability}
+                formatted={deckResult?.cardProbabilityFormatted}
+                label={`Draw ≥${minCardCopies}`}
+              />
+              <p className="analysis-result" aria-live="polite">
+                Chance to draw at least {minCardCopies} by seeing {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
+                <strong>{deckResult?.cardProbabilityFormatted ?? "—"}</strong>
+              </p>
+            </div>
           </>
         )}
       </article>
@@ -311,10 +319,17 @@ export function DeckAnalysisCalculators({
             onChange={(event) => setMinLands(Math.max(0, Number(event.target.value) || 0))}
           />
         </label>
-        <p className="analysis-result" aria-live="polite">
-          Chance for at least {minLands} land(s) in {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
-          <strong>{deckResult?.landProbabilityFormatted ?? "—"}</strong>
-        </p>
+        <div className="gauge-result">
+          <ProbabilityGauge
+            value={deckResult?.landProbability}
+            formatted={deckResult?.landProbabilityFormatted}
+            label={`≥${minLands} lands`}
+          />
+          <p className="analysis-result" aria-live="polite">
+            Chance for at least {minLands} land(s) in {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
+            <strong>{deckResult?.landProbabilityFormatted ?? "—"}</strong>
+          </p>
+        </div>
       </article>
 
       <article className="analysis-card">
@@ -346,11 +361,18 @@ export function DeckAnalysisCalculators({
               />
             </label>
             {selectedTagId > 0 && tagResult.focus && (
-              <p className="analysis-result" aria-live="polite">
-                Focus — chance for at least {minTagCards} &ldquo;{tagResult.focus.name}&rdquo; in{" "}
-                {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
-                <strong>{tagResult.focus.sampleProbFormatted}</strong> ({tagResult.focus.copiesInDeck} in deck)
-              </p>
+              <div className="gauge-result">
+                <ProbabilityGauge
+                  value={tagResult.focus.sampleProb}
+                  formatted={tagResult.focus.sampleProbFormatted}
+                  label={`≥${minTagCards} tagged`}
+                />
+                <p className="analysis-result" aria-live="polite">
+                  Focus — chance for at least {minTagCards} &ldquo;{tagResult.focus.name}&rdquo; in{" "}
+                  {deckResult?.effectiveSampleSize ?? sampleSize} cards:{" "}
+                  <strong>{tagResult.focus.sampleProbFormatted}</strong> ({tagResult.focus.copiesInDeck} in deck)
+                </p>
+              </div>
             )}
             <ul className="analysis-tag-list" aria-label="Tag draw odds">
               {(tagResult.tags ?? []).map((stat) => (
@@ -432,9 +454,16 @@ export function DeckAnalysisCalculators({
             Exactly
           </button>
         </div>
-        <p className="analysis-result" aria-live="polite">
-          Probability: <strong>{genericResult?.probabilityFormatted ?? "—"}</strong>
-        </p>
+        <div className="gauge-result">
+          <ProbabilityGauge
+            value={genericResult?.probability}
+            formatted={genericResult?.probabilityFormatted}
+            label={genericMode === "at-least" ? `≥${genericMinK} of ${genericK}` : `exactly ${genericMinK}`}
+          />
+          <p className="analysis-result" aria-live="polite">
+            Probability: <strong>{genericResult?.probabilityFormatted ?? "—"}</strong>
+          </p>
+        </div>
       </article>
     </>
   );
