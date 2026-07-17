@@ -7,6 +7,8 @@ import {cards} from '../models';
 
 export function AddCardToDeckByName(arg1:number,arg2:string,arg3:number):Promise<void>;
 
+export function AddTagsToCards(arg1:Array<string>,arg2:Array<number>):Promise<void>;
+
 export function AnalyzeDeckDraw(arg1:analysis.DeckDrawAnalysisRequest):Promise<analysis.DeckDrawAnalysisResult>;
 
 export function AnalyzeDeckTags(arg1:analysis.DeckTagAnalysisRequest):Promise<analysis.DeckTagAnalysisResult>;
@@ -20,6 +22,8 @@ export function CompareDeck(arg1:string):Promise<collection.DeckCompareResult>;
 export function CreateCollectionFolder(arg1:any,arg2:string):Promise<number>;
 
 export function CreateCollectionTag(arg1:string,arg2:string):Promise<number>;
+
+export function DeleteCollectionCards(arg1:Array<string>):Promise<void>;
 
 export function DeleteCollectionFolder(arg1:number):Promise<void>;
 
@@ -58,6 +62,8 @@ export function MoveCollectionFolder(arg1:number,arg2:any):Promise<void>;
 export function PreviewCSVImport(arg1:Array<number>):Promise<collection.ImportPreview>;
 
 export function PreviewTextImport(arg1:string):Promise<collection.ImportPreview>;
+
+export function RemoveTagsFromCards(arg1:Array<string>,arg2:Array<number>):Promise<void>;
 
 export function RenameCollectionFolder(arg1:number,arg2:string):Promise<void>;
 

@@ -97,7 +97,10 @@ function panelApi(rows: CollectionItem[], tags: CollectionTag[] = sampleTags): B
     ListLentCards: vi.fn(),
     ReturnCard: vi.fn(),
     RepairCompareMismatches: vi.fn(),
-    FormatMissingDecklist: vi.fn()
+    FormatMissingDecklist: vi.fn(),
+    AddTagsToCards: vi.fn().mockResolvedValue(undefined),
+    RemoveTagsFromCards: vi.fn().mockResolvedValue(undefined),
+    DeleteCollectionCards: vi.fn().mockResolvedValue(undefined)
   } as unknown as BackendApi;
 }
 
@@ -192,6 +195,87 @@ describe("CollectionPanel", () => {
     await userEvent.click(within(tagFilter).getByRole("button", { name: "Reserved" }));
     expect(screen.queryByText("Lightning Bolt", { selector: "strong" })).not.toBeInTheDocument();
     expect(screen.getByText("No cards found.")).toBeInTheDocument();
+  });
+
+  it("shows the bulk toolbar when rows are selected and clears the selection", async () => {
+    render(<CollectionPanel api={panelApi(sampleRows())} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    expect(screen.queryByRole("toolbar", { name: "Bulk actions" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Lightning Bolt" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Counterspell" }));
+
+    const toolbar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    expect(within(toolbar).getByText("selected").closest("span")?.querySelector("strong")?.textContent).toBe("2");
+
+    await userEvent.click(within(toolbar).getByRole("button", { name: "Clear selection" }));
+    expect(screen.queryByRole("toolbar", { name: "Bulk actions" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Lightning Bolt" })).not.toBeChecked();
+  });
+
+  it("selects all filtered rows via the header checkbox", async () => {
+    render(<CollectionPanel api={panelApi(sampleRows())} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select all cards" }));
+
+    const toolbar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    expect(within(toolbar).getByText("selected").closest("span")?.querySelector("strong")?.textContent).toBe("3");
+
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select all cards" }));
+    expect(screen.queryByRole("toolbar", { name: "Bulk actions" })).not.toBeInTheDocument();
+  });
+
+  it("adds tags to the selected cards in bulk", async () => {
+    const api = panelApi(sampleRows());
+    render(<CollectionPanel api={api} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Lightning Bolt" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Counterspell" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add tags…" }));
+
+    const modal = screen.getByRole("dialog", { name: "Add tags to 2 cards" });
+    await userEvent.click(within(modal).getByRole("checkbox", { name: "Reserved" }));
+    await userEvent.click(within(modal).getByRole("button", { name: "Add tags" }));
+
+    expect(api.AddTagsToCards).toHaveBeenCalledWith(["oracle-bolt", "oracle-counterspell"], [3]);
+    expect(screen.queryByRole("dialog", { name: "Add tags to 2 cards" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "Bulk actions" })).not.toBeInTheDocument();
+  });
+
+  it("removes tags from the selected cards in bulk", async () => {
+    const api = panelApi(sampleRows());
+    render(<CollectionPanel api={api} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Lightning Bolt" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove tags…" }));
+
+    const modal = screen.getByRole("dialog", { name: "Remove tags from 1 card" });
+    await userEvent.click(within(modal).getByRole("checkbox", { name: "Trade" }));
+    await userEvent.click(within(modal).getByRole("button", { name: "Remove tags" }));
+
+    expect(api.RemoveTagsFromCards).toHaveBeenCalledWith(["oracle-bolt"], [1]);
+  });
+
+  it("deletes selected cards only after confirmation", async () => {
+    const api = panelApi(sampleRows());
+    render(<CollectionPanel api={api} setMessage={vi.fn()} />);
+
+    await screen.findByText("Lightning Bolt", { selector: "strong" });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Lightning Bolt" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Sol Ring" }));
+
+    const toolbar = screen.getByRole("toolbar", { name: "Bulk actions" });
+    await userEvent.click(within(toolbar).getByRole("button", { name: "Delete" }));
+    expect(api.DeleteCollectionCards).not.toHaveBeenCalled();
+    expect(within(toolbar).getByText(/Delete 2 cards from the collection\?/)).toBeInTheDocument();
+
+    await userEvent.click(within(toolbar).getByRole("button", { name: "Confirm delete" }));
+    expect(api.DeleteCollectionCards).toHaveBeenCalledWith(["oracle-bolt", "oracle-solring"]);
+    expect(screen.queryByRole("toolbar", { name: "Bulk actions" })).not.toBeInTheDocument();
   });
 
   it("saves card tags from the row editor", async () => {

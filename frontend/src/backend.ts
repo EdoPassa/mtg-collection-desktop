@@ -61,6 +61,9 @@ export type BackendApi = {
   UpdateCollectionTagColor(tagID: number, color: string): Promise<void>;
   DeleteCollectionTag(tagID: number): Promise<void>;
   SetCardTags(oracleID: string, tagIDs: number[]): Promise<void>;
+  AddTagsToCards(oracleIDs: string[], tagIDs: number[]): Promise<void>;
+  RemoveTagsFromCards(oracleIDs: string[], tagIDs: number[]): Promise<void>;
+  DeleteCollectionCards(oracleIDs: string[]): Promise<void>;
   PreviewTextImport(text: string): Promise<ImportPreview>;
   PreviewCSVImport(data: number[]): Promise<ImportPreview>;
   CommitImport(rows: ResolvedLine[]): Promise<void>;
@@ -135,6 +138,9 @@ export function createBackendApi(overrides: Partial<WailsBindings> = {}): Backen
     UpdateCollectionTagColor: bindings.UpdateCollectionTagColor,
     DeleteCollectionTag: bindings.DeleteCollectionTag,
     SetCardTags: (oracleID, tagIDs) => bindings.SetCardTags(oracleID, tagIDs),
+    AddTagsToCards: (oracleIDs, tagIDs) => bindings.AddTagsToCards(oracleIDs, tagIDs),
+    RemoveTagsFromCards: (oracleIDs, tagIDs) => bindings.RemoveTagsFromCards(oracleIDs, tagIDs),
+    DeleteCollectionCards: (oracleIDs) => bindings.DeleteCollectionCards(oracleIDs),
     PreviewTextImport: (text) => bindings.PreviewTextImport(text) as Promise<ImportPreview>,
     PreviewCSVImport: (data) => bindings.PreviewCSVImport(data) as Promise<ImportPreview>,
     CommitImport: (rows) => bindings.CommitImport(rows as collection.ResolvedLine[]),

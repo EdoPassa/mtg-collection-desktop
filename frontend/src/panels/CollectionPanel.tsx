@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { CollectionFolder, CollectionItem, CollectionTag, FolderCard } from "../backend";
 import { UnsortedFolderID } from "../backend";
+import { BulkTagModal } from "../components/BulkTagModal";
 import { CardImage } from "../components/CardImage";
 import { ColorIdentityDot } from "../components/ColorIdentityDot";
 import { EmptyState } from "../components/EmptyState";
@@ -99,6 +100,9 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
   const [activeTagIds, setActiveTagIds] = useState<ReadonlySet<number>>(new Set());
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [editingTagsRow, setEditingTagsRow] = useState<DisplayRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [bulkTagMode, setBulkTagMode] = useState<"add" | "remove" | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function loadTags() {
     try {
@@ -149,6 +153,7 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
   }, []);
 
   useEffect(() => {
+    clearSelection();
     void loadRows(scope);
   }, [scope]);
 
@@ -210,6 +215,75 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
       }
       return next;
     });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setBulkTagMode(null);
+    setConfirmingDelete(false);
+  }
+
+  function toggleSelected(oracleId: string) {
+    setConfirmingDelete(false);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(oracleId)) {
+        next.delete(oracleId);
+      } else {
+        next.add(oracleId);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setConfirmingDelete(false);
+    setSelectedIds((current) => {
+      const allSelected = filtered.length > 0 && filtered.every((row) => current.has(row.card.oracleId));
+      if (allSelected) {
+        return new Set();
+      }
+      return new Set(filtered.map((row) => row.card.oracleId));
+    });
+  }
+
+  async function handleBulkTags(tagIDs: number[]) {
+    const oracleIDs = [...selectedIds];
+    const mode = bulkTagMode;
+    if (!mode || oracleIDs.length === 0 || tagIDs.length === 0) {
+      setBulkTagMode(null);
+      return;
+    }
+    try {
+      if (mode === "add") {
+        await api.AddTagsToCards(oracleIDs, tagIDs);
+      } else {
+        await api.RemoveTagsFromCards(oracleIDs, tagIDs);
+      }
+      const cardsLabel = `${oracleIDs.length} card${oracleIDs.length === 1 ? "" : "s"}`;
+      const tagsLabel = `${tagIDs.length} tag${tagIDs.length === 1 ? "" : "s"}`;
+      setMessage(mode === "add" ? `Added ${tagsLabel} to ${cardsLabel}.` : `Removed ${tagsLabel} from ${cardsLabel}.`);
+      clearSelection();
+      await Promise.all([loadRows(), loadTags()]);
+    } catch (error) {
+      setMessage(String(error));
+    }
+  }
+
+  async function handleBulkDelete() {
+    const oracleIDs = [...selectedIds];
+    if (oracleIDs.length === 0) {
+      setConfirmingDelete(false);
+      return;
+    }
+    try {
+      await api.DeleteCollectionCards(oracleIDs);
+      setMessage(`Deleted ${oracleIDs.length} card${oracleIDs.length === 1 ? "" : "s"} from the collection.`);
+      clearSelection();
+      await refreshAll();
+    } catch (error) {
+      setMessage(String(error));
+    }
   }
 
   async function handleSaveCardTags(oracleID: string, tagIDs: number[]) {
@@ -458,6 +532,41 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
             </button>
           </div>
 
+          {selectedIds.size > 0 ? (
+            <div className="collection-bulk-toolbar" role="toolbar" aria-label="Bulk actions">
+              <span className="collection-bulk-count">
+                <strong>{selectedIds.size}</strong> selected
+              </span>
+              <button type="button" className="ghost" onClick={() => setBulkTagMode("add")}>
+                Add tags…
+              </button>
+              <button type="button" className="ghost" onClick={() => setBulkTagMode("remove")}>
+                Remove tags…
+              </button>
+              {confirmingDelete ? (
+                <span className="collection-bulk-confirm">
+                  <span>
+                    Delete {selectedIds.size} card{selectedIds.size === 1 ? "" : "s"} from the collection? Decks and
+                    lending history are kept.
+                  </span>
+                  <button type="button" className="primary" onClick={() => void handleBulkDelete()}>
+                    Confirm delete
+                  </button>
+                  <button type="button" className="ghost" onClick={() => setConfirmingDelete(false)}>
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="ghost collection-bulk-delete" onClick={() => setConfirmingDelete(true)}>
+                  Delete
+                </button>
+              )}
+              <button type="button" className="ghost" onClick={clearSelection}>
+                Clear selection
+              </button>
+            </div>
+          ) : null}
+
           <div className="collection-body">
           {filtered.length === 0 ? (
             <EmptyState
@@ -470,6 +579,9 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
               allTags={tags}
               showAllocation={scope.kind === "all"}
               canMove={scope.kind !== "all"}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelected}
+              onToggleSelectAll={toggleSelectAll}
               movingOracleId={movingOracleId}
               moveQty={moveQty}
               moveTargetId={moveTargetId}
@@ -492,6 +604,9 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
               allTags={tags}
               showAllocation={scope.kind === "all"}
               canMove={scope.kind !== "all"}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelected}
+              onToggleSelectAll={toggleSelectAll}
               movingOracleId={movingOracleId}
               moveQty={moveQty}
               moveTargetId={moveTargetId}
@@ -521,6 +636,17 @@ export function CollectionPanel({ api, setMessage }: PanelProps) {
         onUpdateColor={handleUpdateTagColor}
         onDelete={handleDeleteTag}
       />
+
+      {bulkTagMode ? (
+        <BulkTagModal
+          mode={bulkTagMode}
+          cardCount={selectedIds.size}
+          allTags={tags}
+          onClose={() => setBulkTagMode(null)}
+          onConfirm={handleBulkTags}
+          onCreateTag={handleCreateTag}
+        />
+      ) : null}
     </section>
   );
 }
@@ -530,6 +656,9 @@ type CollectionViewProps = {
   allTags: CollectionTag[];
   showAllocation: boolean;
   canMove: boolean;
+  selectedIds: ReadonlySet<string>;
+  onToggleSelect: (oracleId: string) => void;
+  onToggleSelectAll: () => void;
   movingOracleId: string | null;
   moveQty: number;
   moveTargetId: string;
@@ -682,6 +811,9 @@ function CollectionTable({
   allTags,
   showAllocation,
   canMove,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
   movingOracleId,
   moveQty,
   moveTargetId,
@@ -700,8 +832,11 @@ function CollectionTable({
 }: CollectionViewProps) {
   const { widths, startResize } = useResizableColumns();
 
+  const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.card.oracleId));
+
   const headerColumns = useMemo((): HeaderColumn[] => {
     const columns: HeaderColumn[] = [
+      { key: "select", className: "col-select", label: null, ariaLabel: "Select" },
       { key: "thumb", className: "col-thumb", label: null, ariaLabel: "Card image" },
       { key: "name", className: "col-name", label: "Card" },
       { key: "cost", className: "col-cost", label: "Cost" },
@@ -745,19 +880,43 @@ function CollectionTable({
         </colgroup>
         <thead>
           <tr>
-            {headerColumns.map((column) => (
-              <ResizableHeaderCell
-                key={column.key}
-                column={column}
-                width={widths[column.key]}
-                onResizeStart={startResize}
-              />
-            ))}
+            {headerColumns.map((column) =>
+              column.key === "select" ? (
+                <th
+                  key={column.key}
+                  scope="col"
+                  className="col-select"
+                  style={{ width: widths.select, minWidth: widths.select, maxWidth: widths.select }}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label="Select all cards"
+                    checked={allSelected}
+                    onChange={onToggleSelectAll}
+                  />
+                </th>
+              ) : (
+                <ResizableHeaderCell
+                  key={column.key}
+                  column={column}
+                  width={widths[column.key]}
+                  onResizeStart={startResize}
+                />
+              )
+            )}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.card.oracleId}>
+            <tr key={row.card.oracleId} className={selectedIds.has(row.card.oracleId) ? "row--selected" : undefined}>
+              <td className="col-select">
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${row.card.name}`}
+                  checked={selectedIds.has(row.card.oracleId)}
+                  onChange={() => onToggleSelect(row.card.oracleId)}
+                />
+              </td>
               <td className="col-thumb">
                 <CardImage
                   name={row.card.name}
@@ -840,6 +999,8 @@ function CollectionGallery({
   allTags,
   showAllocation,
   canMove,
+  selectedIds,
+  onToggleSelect,
   movingOracleId,
   moveQty,
   moveTargetId,
@@ -860,7 +1021,18 @@ function CollectionGallery({
     <div className="collection-scroll-region">
       <div className="collection-gallery">
       {rows.map((row) => (
-        <article key={row.card.oracleId} className="gallery-card">
+        <article
+          key={row.card.oracleId}
+          className={`gallery-card${selectedIds.has(row.card.oracleId) ? " gallery-card--selected" : ""}`}
+        >
+          <label className="gallery-card-select">
+            <input
+              type="checkbox"
+              aria-label={`Select ${row.card.name}`}
+              checked={selectedIds.has(row.card.oracleId)}
+              onChange={() => onToggleSelect(row.card.oracleId)}
+            />
+          </label>
           <CardImage
             name={row.card.name}
             small={row.card.imageSmall}

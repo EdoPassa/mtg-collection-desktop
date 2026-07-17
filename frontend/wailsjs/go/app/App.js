@@ -6,6 +6,10 @@ export function AddCardToDeckByName(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddCardToDeckByName'](arg1, arg2, arg3);
 }
 
+export function AddTagsToCards(arg1, arg2) {
+  return window['go']['app']['App']['AddTagsToCards'](arg1, arg2);
+}
+
 export function AnalyzeDeckDraw(arg1) {
   return window['go']['app']['App']['AnalyzeDeckDraw'](arg1);
 }
@@ -32,6 +36,10 @@ export function CreateCollectionFolder(arg1, arg2) {
 
 export function CreateCollectionTag(arg1, arg2) {
   return window['go']['app']['App']['CreateCollectionTag'](arg1, arg2);
+}
+
+export function DeleteCollectionCards(arg1) {
+  return window['go']['app']['App']['DeleteCollectionCards'](arg1);
 }
 
 export function DeleteCollectionFolder(arg1) {
@@ -108,6 +116,10 @@ export function PreviewCSVImport(arg1) {
 
 export function PreviewTextImport(arg1) {
   return window['go']['app']['App']['PreviewTextImport'](arg1);
+}
+
+export function RemoveTagsFromCards(arg1, arg2) {
+  return window['go']['app']['App']['RemoveTagsFromCards'](arg1, arg2);
 }
 
 export function RenameCollectionFolder(arg1, arg2) {

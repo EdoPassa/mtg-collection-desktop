@@ -485,6 +485,167 @@ func TestTagCRUDAndAssignments(t *testing.T) {
 	}
 }
 
+func TestAddAndRemoveTagsFromCardsBatch(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	bolt := cards.CardIdentity{OracleID: "oracle-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"}
+	opt := cards.CardIdentity{OracleID: "oracle-opt", Name: "Opt", ScryfallURI: "https://example.test/opt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{bolt, opt}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), bolt.OracleID, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), opt.OracleID, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	tradeID, err := store.CreateTag(t.Context(), "Trade", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foilID, err := store.CreateTag(t.Context(), "Foil", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetCardTags(t.Context(), bolt.OracleID, []int64{tradeID}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Adding is idempotent for the already-tagged bolt and assigns both tags to both cards.
+	if err := store.AddTagsToCards(t.Context(), []string{bolt.OracleID, opt.OracleID}, []int64{tradeID, foilID}); err != nil {
+		t.Fatal(err)
+	}
+	boltTags, err := store.GetCardTagIDs(t.Context(), bolt.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	optTags, err := store.GetCardTagIDs(t.Context(), opt.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boltTags) != 2 || len(optTags) != 2 {
+		t.Fatalf("tags after batch add: bolt=%#v opt=%#v, want 2 each", boltTags, optTags)
+	}
+
+	if err := store.AddTagsToCards(t.Context(), []string{bolt.OracleID}, []int64{9999}); err == nil {
+		t.Fatal("AddTagsToCards accepted an unknown tag")
+	}
+	if err := store.AddTagsToCards(t.Context(), []string{"missing-oracle"}, []int64{tradeID}); err == nil {
+		t.Fatal("AddTagsToCards accepted a card not in collection")
+	}
+
+	// Removing a tag from both cards leaves the other tag untouched; repeats are no-ops.
+	if err := store.RemoveTagsFromCards(t.Context(), []string{bolt.OracleID, opt.OracleID}, []int64{tradeID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RemoveTagsFromCards(t.Context(), []string{bolt.OracleID, opt.OracleID}, []int64{tradeID}); err != nil {
+		t.Fatal(err)
+	}
+	boltTags, err = store.GetCardTagIDs(t.Context(), bolt.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	optTags, err = store.GetCardTagIDs(t.Context(), opt.OracleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boltTags) != 1 || boltTags[0] != foilID || len(optTags) != 1 || optTags[0] != foilID {
+		t.Fatalf("tags after batch remove: bolt=%#v opt=%#v, want only foil", boltTags, optTags)
+	}
+}
+
+func TestDeleteCollectionCardsRemovesOwnershipButKeepsDecksAndLending(t *testing.T) {
+	store := openTestStore(t)
+	defer store.Close()
+
+	bolt := cards.CardIdentity{OracleID: "oracle-bolt", Name: "Lightning Bolt", ScryfallURI: "https://example.test/bolt"}
+	opt := cards.CardIdentity{OracleID: "oracle-opt", Name: "Opt", ScryfallURI: "https://example.test/opt"}
+	if err := store.UpsertCards(t.Context(), []cards.CardIdentity{bolt, opt}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), bolt.OracleID, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.IncrementCollection(t.Context(), opt.OracleID, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	folderID, err := store.CreateFolder(t.Context(), nil, "Binder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MoveCopies(t.Context(), bolt.OracleID, UnsortedFolderID, folderID, 2); err != nil {
+		t.Fatal(err)
+	}
+	tagID, err := store.CreateTag(t.Context(), "Trade", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetCardTags(t.Context(), bolt.OracleID, []int64{tagID}); err != nil {
+		t.Fatal(err)
+	}
+	deckID, err := store.CreateDeck(t.Context(), "Burn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddCardToDeck(t.Context(), deckID, bolt, cards.BoardMain, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LendCard(t.Context(), LendInput{OracleID: bolt.OracleID, Quantity: 1, BorrowerName: "Alice", LentDate: "2026-05-20"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteCollectionCards(t.Context(), []string{bolt.OracleID, opt.OracleID}); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := store.ListCollection(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("collection after delete = %#v, want empty", rows)
+	}
+	folderCards, err := store.ListFolderCards(t.Context(), folderID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folderCards) != 0 {
+		t.Fatalf("folder cards after delete = %#v, want empty", folderCards)
+	}
+	byOracle, err := store.GetTagsByOracleID(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(byOracle[bolt.OracleID]) != 0 {
+		t.Fatalf("tags after delete = %#v, want none", byOracle[bolt.OracleID])
+	}
+	deckCards, err := store.ListDeckCards(t.Context(), deckID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deckCards) != 1 || deckCards[0].Quantity != 4 {
+		t.Fatalf("deck cards after delete = %#v, want bolt qty 4 intact", deckCards)
+	}
+	lent, err := store.ListLentCards(t.Context(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(lent) != 1 {
+		t.Fatalf("lent rows after delete = %#v, want lending history intact", lent)
+	}
+
+	// Deleting cards that are no longer owned is a no-op.
+	if err := store.DeleteCollectionCards(t.Context(), []string{bolt.OracleID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteCollectionCards(t.Context(), []string{" "}); err == nil {
+		t.Fatal("DeleteCollectionCards accepted a blank oracle id")
+	}
+}
+
 func TestListTagsReturnsEmptySliceForEmptyDatabase(t *testing.T) {
 	store := openTestStore(t)
 	defer store.Close()

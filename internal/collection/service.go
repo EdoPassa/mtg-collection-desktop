@@ -50,6 +50,9 @@ type Store interface {
 	DeleteTag(ctx context.Context, tagID int64) error
 	GetTagsByOracleID(ctx context.Context) (map[string][]cards.CollectionTag, error)
 	SetCardTags(ctx context.Context, oracleID string, tagIDs []int64) error
+	AddTagsToCards(ctx context.Context, oracleIDs []string, tagIDs []int64) error
+	RemoveTagsFromCards(ctx context.Context, oracleIDs []string, tagIDs []int64) error
+	DeleteCollectionCards(ctx context.Context, oracleIDs []string) error
 }
 
 type Service struct {

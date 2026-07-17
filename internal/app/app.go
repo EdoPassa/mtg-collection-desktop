@@ -163,3 +163,15 @@ func (a *App) DeleteCollectionTag(tagID int64) error {
 func (a *App) SetCardTags(oracleID string, tagIDs []int64) error {
 	return a.service.SetCardTags(context.Background(), oracleID, tagIDs)
 }
+
+func (a *App) AddTagsToCards(oracleIDs []string, tagIDs []int64) error {
+	return a.service.AddTagsToCards(context.Background(), oracleIDs, tagIDs)
+}
+
+func (a *App) RemoveTagsFromCards(oracleIDs []string, tagIDs []int64) error {
+	return a.service.RemoveTagsFromCards(context.Background(), oracleIDs, tagIDs)
+}
+
+func (a *App) DeleteCollectionCards(oracleIDs []string) error {
+	return a.service.DeleteCollectionCards(context.Background(), oracleIDs)
+}

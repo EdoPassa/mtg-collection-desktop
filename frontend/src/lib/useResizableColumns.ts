@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type CollectionColumnKey =
+  | "select"
   | "thumb"
   | "name"
   | "cost"
@@ -15,6 +16,7 @@ export type CollectionColumnKey =
   | "actions";
 
 export const COLLECTION_COLUMN_DEFAULTS: Record<CollectionColumnKey, number> = {
+  select: 40,
   thumb: 56,
   name: 220,
   cost: 96,
@@ -30,6 +32,7 @@ export const COLLECTION_COLUMN_DEFAULTS: Record<CollectionColumnKey, number> = {
 };
 
 const COLUMN_MIN: Partial<Record<CollectionColumnKey, number>> = {
+  select: 36,
   thumb: 48,
   name: 120,
   cost: 64,

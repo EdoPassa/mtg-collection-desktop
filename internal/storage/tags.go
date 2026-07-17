@@ -228,6 +228,105 @@ func (s *Store) SetCardTags(ctx context.Context, oracleID string, tagIDs []int64
 	return tx.Commit()
 }
 
+// AddTagsToCards assigns every tag to every card, ignoring pairs that already exist.
+func (s *Store) AddTagsToCards(ctx context.Context, oracleIDs []string, tagIDs []int64) error {
+	oracleIDs, tagIDs, err := s.validateCardTagBatch(ctx, oracleIDs, tagIDs)
+	if err != nil {
+		return err
+	}
+	if len(oracleIDs) == 0 || len(tagIDs) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT OR IGNORE INTO card_tags (oracle_id, tag_id) VALUES (?, ?)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, oracleID := range oracleIDs {
+		for _, tagID := range tagIDs {
+			if _, err := stmt.ExecContext(ctx, oracleID, tagID); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// RemoveTagsFromCards unassigns every tag from every card; missing pairs are ignored.
+func (s *Store) RemoveTagsFromCards(ctx context.Context, oracleIDs []string, tagIDs []int64) error {
+	oracleIDs, tagIDs, err := s.validateCardTagBatch(ctx, oracleIDs, tagIDs)
+	if err != nil {
+		return err
+	}
+	if len(oracleIDs) == 0 || len(tagIDs) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollback(tx)
+	stmt, err := tx.PrepareContext(ctx, `
+		DELETE FROM card_tags WHERE oracle_id = ? AND tag_id = ?
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, oracleID := range oracleIDs {
+		for _, tagID := range tagIDs {
+			if _, err := stmt.ExecContext(ctx, oracleID, tagID); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// validateCardTagBatch trims and deduplicates oracle IDs and tag IDs, verifying that
+// each card is in the collection and each tag exists.
+func (s *Store) validateCardTagBatch(ctx context.Context, oracleIDs []string, tagIDs []int64) ([]string, []int64, error) {
+	seenOracle := map[string]struct{}{}
+	cleanOracle := make([]string, 0, len(oracleIDs))
+	for _, oracleID := range oracleIDs {
+		oracleID = strings.TrimSpace(oracleID)
+		if oracleID == "" {
+			return nil, nil, errors.New("oracle id cannot be empty")
+		}
+		if _, dup := seenOracle[oracleID]; dup {
+			continue
+		}
+		seenOracle[oracleID] = struct{}{}
+		if err := s.ensureCardInCollection(ctx, oracleID); err != nil {
+			return nil, nil, err
+		}
+		cleanOracle = append(cleanOracle, oracleID)
+	}
+	seenTag := map[int64]struct{}{}
+	cleanTags := make([]int64, 0, len(tagIDs))
+	for _, tagID := range tagIDs {
+		if tagID <= 0 {
+			return nil, nil, errors.New("invalid tag id")
+		}
+		if _, dup := seenTag[tagID]; dup {
+			continue
+		}
+		seenTag[tagID] = struct{}{}
+		if err := s.ensureTagExists(ctx, tagID); err != nil {
+			return nil, nil, err
+		}
+		cleanTags = append(cleanTags, tagID)
+	}
+	return cleanOracle, cleanTags, nil
+}
+
 func (s *Store) ensureTagExists(ctx context.Context, tagID int64) error {
 	var exists int
 	if err := s.db.QueryRowContext(ctx, `SELECT 1 FROM tags WHERE id = ?`, tagID).Scan(&exists); err != nil {
